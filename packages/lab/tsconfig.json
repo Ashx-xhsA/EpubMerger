@@ -1,0 +1,9 @@
+{
+  // lab 是实验代码，只在 Node 里运行：读书、读写向量缓存、跑模型
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@epubmerger/lab",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@epubmerger/core": "workspace:*",
+    "@huggingface/transformers": "4.3.0"
+  }
+}

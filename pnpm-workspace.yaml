@@ -4,3 +4,8 @@ packages:
 # 只允许这些依赖在安装时运行脚本（esbuild 需要下载对应平台的二进制，tsx 和 vitest 依赖它）
 onlyBuiltDependencies:
   - esbuild
+# 这两个的安装脚本不需要运行：onnxruntime-node 的 Mac 版二进制已经在包里，脚本只下载 Linux 的 GPU 版；
+# protobufjs 的脚本只检查版本
+ignoredBuiltDependencies:
+  - onnxruntime-node
+  - protobufjs
