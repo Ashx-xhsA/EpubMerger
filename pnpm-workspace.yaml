@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+
+# 只允许这些依赖在安装时运行脚本（esbuild 需要下载对应平台的二进制，tsx 和 vitest 依赖它）
+onlyBuiltDependencies:
+  - esbuild

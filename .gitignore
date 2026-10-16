@@ -1,0 +1,12 @@
+# 本地笔记
+secret/
+
+# 测试数据
+fixtures/
+
+# 依赖与构建产物
+node_modules/
+dist/
+
+# macOS
+.DS_Store

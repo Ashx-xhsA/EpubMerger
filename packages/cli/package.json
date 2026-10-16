@@ -1,0 +1,9 @@
+{
+  "name": "@epubmerger/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@epubmerger/core": "workspace:*"
+  }
+}

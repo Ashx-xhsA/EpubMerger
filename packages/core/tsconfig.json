@@ -1,0 +1,10 @@
+{
+  // core 要同时在 Node（命令行）和浏览器 Web Worker 里运行，
+  // 所以两边的类型定义都不加载：用了任何一边独有的东西（fs、DOMParser……）都会报错
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,19 @@
+{
+  // 所有包共用的规则。每个包的 tsconfig.json 继承这里，再各自声明运行环境（lib / types）
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    // 数组下标访问返回 T | undefined，动态规划里大量用下标，能提前发现越界
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    // 只做类型检查：开发时用 tsx 直接运行 .ts，测试用 Vitest，将来网页用 Vite 打包
+    "noEmit": true,
+    "skipLibCheck": true
+  }
+}

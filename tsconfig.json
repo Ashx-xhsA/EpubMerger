@@ -1,0 +1,10 @@
+{
+  // 根目录只检查工具配置文件（如 vitest.config.ts），它们在 Node 里运行。
+  // 各个包的代码由各自的 tsconfig.json 检查，见 package.json 里的 typecheck 命令
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["*.config.ts"]
+}
