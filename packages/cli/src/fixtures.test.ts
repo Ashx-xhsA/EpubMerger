@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseEpub, type TocEntry } from '@epubmerger/core';
+import { extractBlocks, parseEpub, type TocEntry } from '@epubmerger/core';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const PAIRS_DIR = fileURLToPath(new URL('../../../fixtures/pairs', import.meta.url));
@@ -47,5 +47,29 @@ describe.skipIf(books.length === 0)('fixtures: every book parses', () => {
 
   afterAll(() => {
     console.log(['', '---- fixtures summary ----', ...summary.sort()].join('\n'));
+  });
+});
+
+const extractSummary: string[] = [];
+
+describe.skipIf(books.length === 0)('fixtures: every book extracts', () => {
+  it.each(books)('%s', (name) => {
+    const result = parseEpub(readFileSync(join(PAIRS_DIR, name)));
+    if (!result.ok) return expect.fail(result.error.code);
+    const { blocks } = extractBlocks(result.book);
+    const byRegion = new Map<string, number>();
+    for (const b of blocks) byRegion.set(b.region, (byRegion.get(b.region) ?? 0) + 1);
+    extractSummary.push(
+      [
+        name,
+        `blocks=${blocks.length}`,
+        ...[...byRegion].sort((a, b) => b[1] - a[1]).map(([region, n]) => `${region}=${n}`),
+      ].join('\t'),
+    );
+    expect(byRegion.get('body') ?? 0).toBeGreaterThan(0);
+  });
+
+  afterAll(() => {
+    console.log(['', '---- extract summary ----', ...extractSummary.sort()].join('\n'));
   });
 });
