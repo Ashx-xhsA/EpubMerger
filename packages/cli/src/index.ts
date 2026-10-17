@@ -2,17 +2,21 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   CORE_VERSION,
+  checkLanguagePair,
+  detectLanguage,
   extractBlocks,
   parseEpub,
   type Block,
   type Book,
+  type BookLanguage,
   type TocEntry,
 } from '@epubmerger/core';
 
 const USAGE = `Usage:
   pnpm cli merge <en.epub> <zh.epub> -o <out.epub>
   pnpm cli inspect <book.epub>
-  pnpm cli blocks <book.epub> [--text]`;
+  pnpm cli blocks <book.epub> [--text]
+  pnpm cli lang <a.epub> [b.epub]`;
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -38,6 +42,10 @@ if (command === 'blocks' && args.length === 1 && args[0]) {
   process.exit(blocks(args[0], values.text === true));
 }
 
+if (command === 'lang' && (args.length === 1 || args.length === 2)) {
+  process.exit(lang(args));
+}
+
 const [enPath, zhPath] = args;
 if (command !== 'merge' || !enPath || !zhPath || !values.output) {
   console.error(USAGE);
@@ -61,6 +69,57 @@ function inspect(path: string): number {
       : ['警告：', ...warnings.map((w) => `  ${w.code}：${w.message}`)].join('\n'),
   );
   return 0;
+}
+
+/** 打印每本书的语言判定和统计；两本时再打印组合检查，返回退出码：有错误时 1 */
+function lang(paths: string[]): number {
+  const languages: BookLanguage[] = [];
+  for (const [i, path] of paths.entries()) {
+    const result = parseEpub(readFileSync(path));
+    if (!result.ok) {
+      console.log(`✗ ${path}：${result.error.code}：${result.error.message}`);
+      return 1;
+    }
+    const start = performance.now();
+    const { language, stats } = detectLanguage(extractBlocks(result.book).blocks);
+    const ms = performance.now() - start;
+    languages.push(language);
+    const voted = Object.values(stats.languages).reduce((n, x) => n + x, 0);
+    const share = (n: number) => `${((100 * n) / Math.max(1, voted)).toFixed(1)}%`;
+    console.log(`${paths.length === 2 ? `[${'ab'[i]}] ` : ''}${path}`);
+    console.log(
+      `  判定：${language.kind === 'single' ? language.lang : '不确定'}（${ms.toFixed(0)} ms，不算解析和抽取）`,
+    );
+    const ranked = Object.entries(stats.languages).sort((x, y) => y[1] - x[1]);
+    console.log(
+      `  投票：${ranked.map(([l, n]) => `${l} ${Math.round(n)} 段（${share(n)}）`).join('，') || '无'}`,
+    );
+    const p = stats.paragraphs;
+    console.log(
+      `  段落：${Object.entries(p)
+        .filter(([, n]) => n > 0)
+        .map(([c, n]) => `${c}=${n}`)
+        .join(' ')}`,
+    );
+    console.log(`  繁简专用字：繁 ${stats.variants.traditional}，简 ${stats.variants.simplified}`);
+    for (const [script, votes] of Object.entries(stats.samples)) {
+      console.log(
+        `  franc 抽样（${script}）：${Object.entries(votes)
+          .map(([l, n]) => `${l}=${n}`)
+          .join(' ')}`,
+      );
+    }
+  }
+  const [a, b] = languages;
+  if (a === undefined || b === undefined) return 0;
+  const check = checkLanguagePair(a, b);
+  if (check.issues.length === 0) console.log('组合检查：✓ 通过');
+  for (const issue of check.issues) {
+    const mark = issue.level === 'error' ? '✗' : '⚠';
+    const book = issue.bookSide === 'both' ? '两本' : issue.bookSide;
+    console.log(`组合检查：${mark} ${issue.code}（${book}${issue.lang ? `：${issue.lang}` : ''}）`);
+  }
+  return check.ok ? 0 : 1;
 }
 
 function describeBook(book: Book): string {

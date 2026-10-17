@@ -5,7 +5,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractBlocks, parseEpub, type TocEntry } from '@epubmerger/core';
+import {
+  checkLanguagePair,
+  detectLanguage,
+  extractBlocks,
+  parseEpub,
+  type Block,
+  type TocEntry,
+} from '@epubmerger/core';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const PAIRS_DIR = fileURLToPath(new URL('../../../fixtures/pairs', import.meta.url));
@@ -71,5 +78,42 @@ describe.skipIf(books.length === 0)('fixtures: every book extracts', () => {
 
   afterAll(() => {
     console.log(['', '---- extract summary ----', ...extractSummary.sort()].join('\n'));
+  });
+});
+
+// 语言识别：开发集和测试集的每对书都要认对，组合检查要通过；
+// 把一对书的块交错拼成的"假双语书"没有一种语言占多数，应该判成不确定
+const FIXTURES_DIR = fileURLToPath(new URL('../../../fixtures', import.meta.url));
+
+const langPairs = ['pairs', 'holdout'].flatMap((group) => {
+  const dir = join(FIXTURES_DIR, group);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(join(dir, d.name, 'en.epub')))
+    .map((d) => `${group}/${d.name}`);
+});
+
+function blocksOf(path: string): Block[] {
+  const result = parseEpub(readFileSync(path));
+  if (!result.ok) throw new Error(`${path}: ${result.error.code}`);
+  return extractBlocks(result.book).blocks;
+}
+
+function interleave(a: Block[], b: Block[]): Block[] {
+  return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => [a[i], b[i]])
+    .flat()
+    .filter((x) => x !== undefined);
+}
+
+describe.skipIf(langPairs.length === 0)('fixtures: language detection', () => {
+  it.each(langPairs)('%s', (pair) => {
+    const en = blocksOf(join(FIXTURES_DIR, pair, 'en.epub'));
+    const zh = blocksOf(join(FIXTURES_DIR, pair, 'zh.epub'));
+    const enLang = detectLanguage(en).language;
+    const zhLang = detectLanguage(zh).language;
+    expect(enLang).toEqual({ kind: 'single', lang: 'en' });
+    expect(zhLang).toEqual({ kind: 'single', lang: 'zh-Hans' });
+    expect(checkLanguagePair(enLang, zhLang)).toEqual({ ok: true, issues: [] });
+    expect(detectLanguage(interleave(en, zh)).language).toEqual({ kind: 'uncertain' });
   });
 });

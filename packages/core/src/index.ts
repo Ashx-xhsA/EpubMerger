@@ -3,6 +3,17 @@ export const CORE_VERSION = '0.0.0';
 export { parseEpub } from './epub/parse.ts';
 export { extractBlocks } from './extract/extract.ts';
 export type { Block, BlockKind, ExtractResult, FileInfo, Region } from './extract/types.ts';
+export { detectLanguage } from './lang/detect.ts';
+export { checkLanguagePair, SUPPORTED_LANGUAGES } from './lang/pair.ts';
+export type {
+  BookLanguage,
+  LanguageDetection,
+  LanguageIssue,
+  LanguageIssueCode,
+  LanguagePairCheck,
+  LanguageStats,
+  ParagraphClass,
+} from './lang/types.ts';
 export type {
   Book,
   BookMetadata,
