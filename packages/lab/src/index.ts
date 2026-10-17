@@ -19,6 +19,17 @@ import {
   predictedPath,
   writeMap,
 } from './chapters.ts';
+import {
+  evalGroups,
+  formatTable,
+  globalRatio,
+  METHODS,
+  scores,
+  total,
+  type GroupEval,
+} from './eval.ts';
+import { buildGold, type GoldFix, type GoldGroup } from './gold.ts';
+import { goldCheckHtml, type CheckBook } from './gold-check.ts';
 import { dumpReview, reviewHtml, type Verdict } from './review.ts';
 import { chapterTestHtml, predictAll, scoreChapters } from './chapter-align.ts';
 import { withCache } from './cache.ts';
@@ -43,7 +54,10 @@ const USAGE = `Usage:
   pnpm lab chapters [--prefill order|meaning] [--threshold 0.75] <en.epub> <zh.epub> [--html]
   pnpm lab paragraphs [--model ${MODEL_KEYS.join('|')}] [--threshold 0.75] [--lambda 200] <en.epub> <zh.epub>
   pnpm lab compare [--threshold 0.75] [--lambdas 20,50,100] <pair-dir> [...]
-  pnpm lab chapter-test [--thresholds 0.75,0.8,0.85] [--lambdas 20,50,100] <pair-dir> [...]`;
+  pnpm lab chapter-test [--thresholds 0.75,0.8,0.85] [--lambdas 20,50,100] <pair-dir> [...]
+  pnpm lab gold <en.epub> <zh.epub>
+  pnpm lab eval [--out results.json] <pair-dir> [...]
+  pnpm lab gold-check --out check.html <pair-dir> [...]`;
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -58,6 +72,7 @@ const { values, positionals } = parseArgs({
     dump: { type: 'boolean' },
     review: { type: 'boolean' },
     thresholds: { type: 'string', default: '0.75,0.8,0.85' },
+    out: { type: 'string' },
   },
 });
 
@@ -93,6 +108,12 @@ if (command === 'bench' && args.length >= 1 && (model === 'all' || isModelKey(mo
   isModelKey(model)
 ) {
   await paragraphs(args[0], args[1], model, alignOptions());
+} else if (command === 'gold' && args.length === 2 && args[0] && args[1] && isModelKey(model)) {
+  process.exit(await gold(args[0], args[1], model));
+} else if (command === 'gold-check' && args.length >= 1 && values.out && isModelKey(model)) {
+  await goldCheck(args, model, values.out);
+} else if (command === 'eval' && args.length >= 1 && isModelKey(model)) {
+  await evaluate(args, model);
 } else if (command === 'compare' && args.length >= 1 && isModelKey(model)) {
   await compare(args, model);
 } else if (command === 'chapter-test' && args.length >= 1 && isModelKey(model)) {
@@ -182,6 +203,92 @@ async function paragraphs(
   console.log(
     `\n网页版：${join(dir, 'paragraphs.html')}\n不一致的地方：${join(dir, 'disagreements.txt')}`,
   );
+}
+
+/**
+ * 标准答案：verdicts.json + gold-fixes.json → gold.json（都在书对的文件夹里）。
+ * 有问题时只打印清单、不写文件，返回 1
+ */
+async function gold(enPath: string, zhPath: string, key: ModelKey): Promise<number> {
+  const dir = dirname(enPath);
+  const read = <T>(name: string, field: string): T[] => {
+    const path = join(dir, name);
+    if (!existsSync(path)) return [];
+    return (JSON.parse(readFileSync(path, 'utf8')) as Record<string, T[]>)[field] ?? [];
+  };
+  const verdicts = read<Verdict>('verdicts.json', 'verdicts');
+  const fixes = read<GoldFix>('gold-fixes.json', 'fixes');
+  const groups = await alignBook(enPath, zhPath, key, alignOptions());
+  const result = buildGold(groups, verdicts, fixes);
+  console.log(`${basename(dir)}：${verdicts.length} 条判断，${fixes.length} 条修正`);
+  if (result.problems.length > 0) {
+    console.log(`\n✗ ${result.problems.length} 个问题：\n  ${result.problems.join('\n  ')}`);
+    return 1;
+  }
+  const beads = result.groups.reduce((n, g) => n + g.beads.length, 0);
+  const out = join(dir, 'gold.json');
+  writeFileSync(
+    out,
+    JSON.stringify({ book: basename(dir), groups: result.groups }, null, 1) + '\n',
+  );
+  console.log(`✓ ${result.groups.length} 组、${beads} 个配对单元：${out}`);
+  return 0;
+}
+
+/**
+ * 评估：几对书的四种方法和 gold.json 比，按书、合计打印严格 / 宽松 F1；
+ * --out 时把每组的次数和分数写成 JSON。Gale-Church 的长度比用这几本书一起估
+ */
+async function evaluate(dirs: string[], key: ModelKey): Promise<void> {
+  const books = [];
+  for (const dir of dirs) {
+    const groups = await alignBook(join(dir, 'en.epub'), join(dir, 'zh.epub'), key, alignOptions());
+    const gold = (
+      JSON.parse(readFileSync(join(dir, 'gold.json'), 'utf8')) as { groups: GoldGroup[] }
+    ).groups;
+    books.push({ dir, groups, gold });
+  }
+  const ratio = globalRatio(books.flatMap((b) => b.groups));
+  console.log(`Gale-Church 长度比 c = ${ratio.toFixed(4)}（中文字数 ÷ 英文字数）\n`);
+  const results: { book: string; groups: GroupEval[] }[] = [];
+  for (const b of books) {
+    const groups = evalGroups(b.groups, b.gold, ratio);
+    results.push({ book: basename(b.dir), groups });
+    const beads = groups.reduce((n, g) => n + g.beads, 0);
+    console.log(
+      `${basename(b.dir)}（${groups.length} 组，标准答案 ${beads} 个单元）\n${formatTable(total(groups))}\n`,
+    );
+  }
+  console.log(`合计\n${formatTable(total(results.flatMap((r) => r.groups)))}`);
+  if (values.out) {
+    const withScores = (counts: GroupEval['counts']) =>
+      Object.fromEntries(METHODS.map((m) => [m, { ...counts[m], ...scores(counts[m]) }]));
+    const json = {
+      ratio,
+      books: results.map((r) => ({
+        book: r.book,
+        total: withScores(total(r.groups)),
+        groups: r.groups.map((g) => ({ ...g, counts: withScores(g.counts) })),
+      })),
+      total: withScores(total(results.flatMap((r) => r.groups))),
+    };
+    writeFileSync(values.out, JSON.stringify(json, null, 1) + '\n');
+    console.log(`\n明细：${values.out}`);
+  }
+}
+
+/** 抽查页：每本书的人工修正固定抽 10 条（不到 10 条就全列） */
+async function goldCheck(dirs: string[], key: ModelKey, out: string): Promise<void> {
+  const books: CheckBook[] = [];
+  for (const dir of dirs) {
+    const groups = await alignBook(join(dir, 'en.epub'), join(dir, 'zh.epub'), key, alignOptions());
+    const gold = (
+      JSON.parse(readFileSync(join(dir, 'gold.json'), 'utf8')) as { groups: GoldGroup[] }
+    ).groups;
+    books.push({ book: basename(dir), groups, gold });
+  }
+  writeFileSync(out, goldCheckHtml(books, 10));
+  console.log(`抽查页：${out}`);
 }
 
 function alignOptions(): AlignOptions {

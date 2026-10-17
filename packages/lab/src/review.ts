@@ -186,6 +186,14 @@ export function answerIds(answer: string[], blocks: Block[], near: number): stri
     .join('+');
 }
 
+/** 正确答案在另一边的大概位置：这一行在另一边有段落就用它，没有就按比例估 */
+export function answerNear(g: GroupResult, row: Row): number {
+  const at = rowAt(row);
+  return row.pair.zh.length > 0
+    ? (row.pair.en[0] ?? Math.round((at * g.en.length) / Math.max(1, g.zh.length)))
+    : (row.pair.zh[0] ?? Math.round((at * g.zh.length) / Math.max(1, g.en.length)));
+}
+
 const CLIENT = readFileSync(new URL('./review-client.js', import.meta.url), 'utf8');
 
 /**
@@ -215,11 +223,7 @@ export function reviewHtml(
       const side = key.zh !== undefined ? 'zh' : 'en';
       const v = assigned.get(row.k);
       const at = rowAt(row);
-      // 正确答案在另一边的大概位置：这一行在另一边有段落就用它，没有就按比例估
-      const near =
-        side === 'zh'
-          ? (row.pair.en[0] ?? Math.round((at * g.en.length) / Math.max(1, g.zh.length)))
-          : (row.pair.zh[0] ?? Math.round((at * g.zh.length) / Math.max(1, g.en.length)));
+      const near = answerNear(g, row);
       data.rows.push({
         key: `${g.index}|${side}:${at}:${key.zh ?? key.en}`,
         at,
