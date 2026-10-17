@@ -80,12 +80,19 @@ function collect(nodes: AnyNode[], out: string[]): void {
   }
 }
 
-/** 一组节点的纯文本。连续空白（包括 &nbsp;）合成一个空格，<br> 是换行，每行去掉首尾空白 */
+/** 软连字符：只在行尾断词时才显示的连字符（"Fem\u00adin\u00adism"），文字里看不见，但会让同一个词对不上 */
+const SOFT_HYPHEN = /\u00ad/g;
+
+/**
+ * 一组节点的纯文本。连续空白（包括 &nbsp;）合成一个空格，<br> 是换行，每行去掉首尾空白，
+ * 去掉软连字符
+ */
 export function nodesText(nodes: AnyNode[]): string {
   const parts: string[] = [];
   collect(nodes, parts);
   return parts
     .join('')
+    .replace(SOFT_HYPHEN, '')
     .replace(/\s+/g, ' ')
     .split(BR)
     .map((line) => line.trim())

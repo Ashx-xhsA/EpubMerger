@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import {
   align,
-  combinedCost,
   cosine,
   embeddingCost,
+  isSymbolOnly,
   lengthCost,
+  pairParagraphs,
   type Block,
   type ChapterMap,
   type Pair,
@@ -52,12 +53,7 @@ function chars(b: Block): number {
   return b.text.replace(/\s/g, '').length;
 }
 
-/** 一个字母、数字、汉字都没有的块（"—""◆◆◆◆""* * *"）。它们不参与配对，生成 ePub 时放回原位 */
-export function isSymbolOnly(b: Block): boolean {
-  return !/[\p{L}\p{N}]/u.test(b.text);
-}
-
-/** 三种方法在一组里的配对。compare 命令换 lambda 时也用它 */
+/** 三种方法在一组里的配对。合并法用 core 的；另外两种只在实验里做对比。compare 命令换 lambda 时也用它 */
 export function alignGroup(
   en: Block[],
   zh: Block[],
@@ -71,7 +67,7 @@ export function alignGroup(
   return {
     byLength: align(en.length, zh.length, length),
     byMeaning: align(en.length, zh.length, meaning),
-    byCombined: align(en.length, zh.length, combinedCost(length, meaning, options.lambda)),
+    byCombined: pairParagraphs(en, zh, { en: enVecs, zh: zhVecs }, options),
   };
 }
 

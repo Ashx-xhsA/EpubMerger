@@ -41,6 +41,19 @@ export type {
   ChapterWarningCode,
   TocStats,
 } from './chapters/types.ts';
+export {
+  alignParagraphs,
+  isSymbolOnly,
+  pairParagraphs,
+  PARAGRAPH_LAMBDA,
+  PARAGRAPH_THRESHOLD,
+  withSymbols,
+} from './paragraphs/align-paragraphs.ts';
+export type {
+  PairOptions,
+  ParagraphAlignment,
+  ParagraphOptions,
+} from './paragraphs/align-paragraphs.ts';
 export { parseEpub } from './epub/parse.ts';
 export { extractBlocks } from './extract/extract.ts';
 export type { Block, BlockKind, ExtractResult, FileInfo, Region } from './extract/types.ts';

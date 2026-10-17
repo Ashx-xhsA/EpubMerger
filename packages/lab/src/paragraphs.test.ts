@@ -1,6 +1,6 @@
 import type { Block } from '@epubmerger/core';
 import { describe, expect, it } from 'vitest';
-import { isSymbolOnly, partners, scoreJudged, type GroupResult } from './paragraphs.ts';
+import { partners, scoreJudged, type GroupResult } from './paragraphs.ts';
 
 const block = (text: string): Block => ({
   kind: 'para',
@@ -22,21 +22,6 @@ describe('partners', () => {
   it('lists what each paragraph was paired with, empty when skipped', () => {
     expect(partners(pairs, 'zh', 4)).toEqual(['0', '0', '', '1+2']);
     expect(partners(pairs, 'en', 3)).toEqual(['0+1', '3', '3']);
-  });
-});
-
-describe('isSymbolOnly', () => {
-  it('finds blocks without letters, digits or Chinese characters', () => {
-    expect(['—', '◆◆◆◆ ◆◆◆◆', '* * *'].map((t) => isSymbolOnly(block(t)))).toEqual([
-      true,
-      true,
-      true,
-    ]);
-    expect(['16', 'TH(E)', '雨如泪下。'].map((t) => isSymbolOnly(block(t)))).toEqual([
-      false,
-      false,
-      false,
-    ]);
   });
 });
 

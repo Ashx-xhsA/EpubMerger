@@ -25,6 +25,10 @@ describe('elementText', () => {
     );
   });
 
+  it('removes soft hyphens, written as characters or entities', () => {
+    expect(p('Fem\u00adin\u00adism and fem&shy;i&#173;nism')).toBe('Feminism and feminism');
+  });
+
   it('keeps the text of inline elements', () => {
     expect(p('It was <i>the</i> <b>best</b> of times')).toBe('It was the best of times');
   });

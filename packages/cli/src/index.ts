@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  alignParagraphs,
   CHAPTER_THRESHOLD,
   CORE_VERSION,
   chapterSections,
@@ -29,7 +30,8 @@ const USAGE = `Usage:
   pnpm cli blocks <book.epub> [--text]
   pnpm cli chapters <book.epub> [--ignore-toc]
   pnpm cli chapters <en.epub> <zh.epub> [--map <file>] [--prefill meaning|order] [--threshold ${CHAPTER_THRESHOLD}]
-  pnpm cli lang <a.epub> [b.epub]`;
+  pnpm cli lang <a.epub> [b.epub]
+  pnpm cli align <en.epub> <zh.epub> [--map <file>] [--length]`;
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -41,6 +43,7 @@ const { values, positionals } = parseArgs({
     map: { type: 'string' },
     prefill: { type: 'string', default: 'meaning' },
     threshold: { type: 'string', default: String(CHAPTER_THRESHOLD) },
+    length: { type: 'boolean' },
   },
 });
 
@@ -75,6 +78,10 @@ if (
 
 if (command === 'lang' && (args.length === 1 || args.length === 2)) {
   process.exit(lang(args));
+}
+
+if (command === 'align' && args.length === 2 && args[0] && args[1]) {
+  process.exit(await alignBook(args[0], args[1], values.length === true));
 }
 
 const [enPath, zhPath] = args;
@@ -290,6 +297,61 @@ async function chapterMap(
     return 1;
   }
   console.log('\n✓ 章节表检查通过');
+  return 0;
+}
+
+/**
+ * 按确认过的章节表逐组配段落，打印每组配成几对、几段没有对应。
+ * lengthOnly 时不加载模型，只按长度配。返回退出码：读不了书或章节表有问题时 1
+ */
+async function alignBook(enPath: string, zhPath: string, lengthOnly: boolean): Promise<number> {
+  const en = readSections(enPath);
+  const zh = readSections(zhPath);
+  if (typeof en === 'string' || typeof zh === 'string') {
+    if (typeof en === 'string') console.log(`✗ ${enPath}：${en}`);
+    if (typeof zh === 'string') console.log(`✗ ${zhPath}：${zh}`);
+    return 1;
+  }
+  const path = values.map ?? join(dirname(enPath), 'chapters.json');
+  if (!existsSync(path)) {
+    console.log(`✗ 没有章节表 ${path}，先运行 pnpm cli chapters <en.epub> <zh.epub>`);
+    return 1;
+  }
+  const map = JSON.parse(readFileSync(path, 'utf8')) as ChapterMap;
+  const problems = validateChapterMap(map.groups, en.length, zh.length);
+  if (problems.length > 0) {
+    console.log(`✗ 章节表有问题：\n  ${problems.join('\n  ')}`);
+    return 1;
+  }
+
+  const start = performance.now();
+  const embedder = lengthOnly ? undefined : await loadE5();
+  const total = { pairs: 0, enOnly: 0, zhOnly: 0 };
+  let method = '';
+  for (const [k, g] of map.groups.entries()) {
+    const enBlocks = g.en.flatMap((i) => en[i]!.blocks);
+    const zhBlocks = g.zh.flatMap((i) => zh[i]!.blocks);
+    if (enBlocks.length === 0 || zhBlocks.length === 0) continue;
+    const result = await alignParagraphs(enBlocks, zhBlocks, { embedder });
+    method = result.method;
+    const pairs = result.pairs.filter((p) => p.en.length > 0 && p.zh.length > 0).length;
+    const enOnly = result.pairs.filter((p) => p.zh.length === 0).length;
+    const zhOnly = result.pairs.filter((p) => p.en.length === 0).length;
+    total.pairs += pairs;
+    total.enOnly += enOnly;
+    total.zhOnly += zhOnly;
+    const titles = (ids: number[], sections: Section[]) =>
+      ids.map((i) => sections[i]!.title).join(' + ');
+    console.log(
+      `[${k}] ${titles(g.en, en)} ↔ ${titles(g.zh, zh)}：英 ${enBlocks.length} 段、中 ${zhBlocks.length} 段，` +
+        `配成 ${pairs} 对，英文没对应 ${enOnly}，中文没对应 ${zhOnly}`,
+    );
+  }
+  const how = method === 'combined' ? '长度 + 意思' : '只按长度';
+  console.log(
+    `\n共配成 ${total.pairs} 对，英文没对应 ${total.enOnly} 段，中文没对应 ${total.zhOnly} 段` +
+      `（${how}，${((performance.now() - start) / 1000).toFixed(1)} 秒）`,
+  );
   return 0;
 }
 
