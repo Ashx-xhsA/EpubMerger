@@ -1,24 +1,28 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
+import {
+  cosine,
+  prefillChapters,
+  sectionVectors,
+  validateChapterMap,
+  withTitles,
+  type ChapterMap,
+} from '@epubmerger/core';
 import { benchBook, benchSummary, formatBench, type BookBench } from './bench.ts';
 import {
   bookSections,
   formatMap,
   loadOrCreateMap,
   mapHtml,
-  inBookOrder,
   mapPath,
   predictedPath,
-  validate,
-  withTitles,
   writeMap,
 } from './chapters.ts';
 import { dumpReview, reviewHtml, type Verdict } from './review.ts';
-import { chapterTestHtml, predictAll, scoreChapters, sectionVectors } from './chapter-align.ts';
+import { chapterTestHtml, predictAll, scoreChapters } from './chapter-align.ts';
 import { withCache } from './cache.ts';
-import type { ChapterMap } from './chapters.ts';
-import { cosine, isModelKey, loadEmbedder, MODELS, type ModelKey } from './embed.ts';
+import { isModelKey, loadEmbedder, MODELS, type ModelKey } from './embed.ts';
 import {
   alignBook,
   alignGroup,
@@ -114,7 +118,7 @@ function chapters(enPath: string, zhPath: string, html: boolean): number {
   const map = loadOrCreateMap(enPath, en, zh);
   console.log(`${existed ? '读取' : '已生成草稿'}：${mapPath(enPath)}`);
   console.log(`英文 ${en.length} 节，中文 ${zh.length} 节，共 ${map.groups.length} 组\n`);
-  const problems = validate(map.groups, en.length, zh.length);
+  const problems = validateChapterMap(map.groups, en.length, zh.length);
   if (html) {
     const out = join(dirname(enPath), 'chapters.html');
     writeFileSync(out, mapHtml(basename(dirname(enPath)), map, en, zh, problems));
@@ -138,15 +142,11 @@ async function prefillByMeaning(enPath: string, zhPath: string, key: ModelKey): 
   const en = bookSections(enPath);
   const zh = bookSections(zhPath);
   const embedder = withCache(await loadEmbedder(key));
-  const { meaning } = predictAll(
-    en,
-    zh,
-    await sectionVectors(en, embedder),
-    await sectionVectors(zh, embedder),
-    // 只取按意思的结果，lambda 用不到
-    { threshold: Number(values.threshold), lambda: Number(values.lambda) },
-  );
-  const map = { groups: withTitles(inBookOrder(meaning), en, zh) };
+  const { groups } = await prefillChapters(en, zh, {
+    embedder,
+    threshold: Number(values.threshold),
+  });
+  const map = { groups: withTitles(groups, en, zh) };
   writeMap(predictedPath(enPath), map);
   writeMap(mapPath(enPath), map);
   console.log(`按意思预填：${predictedPath(enPath)}（之后不再改）`);

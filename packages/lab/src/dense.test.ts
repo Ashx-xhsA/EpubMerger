@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDense, denseFromSafetensors, normalize, parseSafetensors } from './dense.ts';
+import { applyDense, denseFromSafetensors, parseSafetensors } from './dense.ts';
 
 /** 按 safetensors 格式拼一个文件。pad 用来让数据区从不是 4 的倍数的位置开始 */
 function makeSafetensors(tensors: Record<string, { shape: number[]; values: number[] }>, pad = '') {
@@ -65,15 +65,5 @@ describe('applyDense', () => {
       }),
     );
     expect(() => applyDense(layer, new Float32Array([1, 2, 3]))).toThrow();
-  });
-});
-
-describe('normalize', () => {
-  it('scales to length 1 and leaves zero vectors alone', () => {
-    expect([...normalize(new Float32Array([3, 4]))]).toEqual([
-      expect.closeTo(0.6),
-      expect.closeTo(0.8),
-    ]);
-    expect([...normalize(new Float32Array([0, 0]))]).toEqual([0, 0]);
   });
 });

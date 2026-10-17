@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { Block } from '@epubmerger/core';
-import type { Pair } from './align.ts';
+import type { Block, Pair } from '@epubmerger/core';
 import { escapeHtml } from './chapters.ts';
 import { partners, type AlignOptions, type GroupResult } from './paragraphs.ts';
 

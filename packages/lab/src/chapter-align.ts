@@ -1,64 +1,23 @@
-import { align, combinedCost, embeddingCost, lengthCost, meanVector, type Pair } from './align.ts';
-import type { Section, Group } from './chapters.ts';
-import { prefill } from './chapters.ts';
-import type { Embedder } from './embed.ts';
+import {
+  align,
+  combinedCost,
+  lengthCost,
+  embeddingCost,
+  nonEmpty,
+  prefillSectionsByOrder,
+  toGroups,
+  type ChapterGroup,
+  type Section,
+} from '@epubmerger/core';
 
 /**
  * 章节自动配对测试：不靠人，程序自己配章节，和用户确认过的章节表比，看能对多少。
- * 四种方法：按顺序预填、按长度、按意思、两者合并。都用段落配对那套走法（1:1、1:2、2:1、跳过）
+ * 四种方法：按顺序预填、按长度、按意思、两者合并。都用段落配对那套走法（1:1、1:2、2:1、跳过）。
+ * 产品里只用按意思和按顺序（core 的 prefillChapters），按长度、合并只在这里做对照
  */
 
 function sectionChars(s: Section): number {
   return s.blocks.reduce((n, b) => n + b.text.replace(/\s/g, '').length, 0);
-}
-
-/** 节的开头和结尾各取大约 n 个字 */
-export function headAndTail(s: Section, n = 1000): { head: string; tail: string } {
-  const text = s.blocks.map((b) => b.text).join('\n');
-  return { head: `${s.title}\n${text.slice(0, n)}`, tail: text.slice(-n) };
-}
-
-/**
- * 每节一个向量：开头一个、结尾一个，取平均。分开算是因为 e5 一次只看 512 个 token，
- * 中文 2,000 字放在一起会被截掉大半
- */
-export async function sectionVectors(
-  sections: Section[],
-  embedder: Embedder,
-): Promise<Float32Array[]> {
-  const parts = sections.flatMap((s) => {
-    const { head, tail } = headAndTail(s);
-    return [head, tail];
-  });
-  const vectors = await embedder.embed(parts);
-  return sections.map((_, i) => meanVector([vectors[2 * i]!, vectors[2 * i + 1]!]));
-}
-
-export interface Prediction {
-  /** 预测的配对，节号是整本书里的编号；一边为空表示不合并 */
-  groups: Group[];
-}
-
-/** 没有块的节（如只指向扉页的目录项）不参与配对，直接算不合并 */
-function nonEmpty(sections: Section[]): number[] {
-  return sections.flatMap((s, i) => (s.blocks.length > 0 ? [i] : []));
-}
-
-/** 把在"非空节"上配出的结果换回整本书的节号，再把空节补成不合并的组 */
-function toGroups(
-  pairs: Pair[],
-  enIds: number[],
-  zhIds: number[],
-  en: Section[],
-  zh: Section[],
-): Group[] {
-  const groups: Group[] = pairs.map((p) => ({
-    en: p.en.map((i) => enIds[i]!),
-    zh: p.zh.map((j) => zhIds[j]!),
-  }));
-  en.forEach((s, i) => s.blocks.length === 0 && groups.push({ en: [i], zh: [] }));
-  zh.forEach((s, j) => s.blocks.length === 0 && groups.push({ en: [], zh: [j] }));
-  return groups;
 }
 
 export interface ChapterOptions {
@@ -72,7 +31,7 @@ export function predictAll(
   enVecs: Float32Array[],
   zhVecs: Float32Array[],
   options: ChapterOptions,
-): Record<'order' | 'length' | 'meaning' | 'combined', Group[]> {
+): Record<'order' | 'length' | 'meaning' | 'combined', ChapterGroup[]> {
   const enIds = nonEmpty(en);
   const zhIds = nonEmpty(zh);
   const length = lengthCost(
@@ -87,9 +46,7 @@ export function predictAll(
   const run = (cost: Parameters<typeof align>[2]) =>
     toGroups(align(enIds.length, zhIds.length, cost), enIds, zhIds, en, zh);
   return {
-    order: prefill(en.length, zh.length, (side, i) =>
-      side === 'en' ? en[i]!.blocks.length === 0 : zh[i]!.blocks.length === 0,
-    ),
+    order: prefillSectionsByOrder(en, zh),
     length: run(length),
     meaning: run(meaning),
     combined: run(combinedCost(length, meaning, options.lambda)),
@@ -99,7 +56,11 @@ export function predictAll(
 const key = (ids: number[]) => ids.join('+');
 
 /** 预测里，含有这一节的那组 */
-function groupOf(predicted: Group[], side: 'en' | 'zh', i: number): Group | undefined {
+function groupOf(
+  predicted: ChapterGroup[],
+  side: 'en' | 'zh',
+  i: number,
+): ChapterGroup | undefined {
   return predicted.find((g) => g[side].includes(i));
 }
 
@@ -116,8 +77,8 @@ export interface ChapterScore {
 
 /** 和用户确认过的章节表比。只有空节的组不计（它们总是不合并） */
 export function scoreChapters(
-  truth: Group[],
-  predicted: Group[],
+  truth: ChapterGroup[],
+  predicted: ChapterGroup[],
   en: Section[],
   zh: Section[],
 ): ChapterScore {
@@ -160,13 +121,13 @@ export function scoreChapters(
 }
 
 /** 预测把这一组正确答案配成了什么，给网页显示："EN 7 ↔ ZH 2+3"、"不合并" */
-export function describePrediction(t: Group, predicted: Group[]): string {
+export function describePrediction(t: ChapterGroup, predicted: ChapterGroup[]): string {
   const side = t.en.length > 0 ? 'en' : 'zh';
   // 正确答案是"不合并"时，列出被配了出去的那些节；否则看第一节被配成了什么
   const ids = t.en.length > 0 && t.zh.length > 0 ? [t.en[0]!] : t[side];
   const paired = ids
     .map((i) => groupOf(predicted, side, i))
-    .filter((p): p is Group => p !== undefined && p.en.length > 0 && p.zh.length > 0);
+    .filter((p): p is ChapterGroup => p !== undefined && p.en.length > 0 && p.zh.length > 0);
   if (paired.length === 0) return '不合并';
   return [...new Set(paired.map((p) => `EN ${key(p.en)} ↔ ZH ${key(p.zh)}`))].join('；');
 }
@@ -181,10 +142,10 @@ const METHOD_NAMES = {
 /** 每本书一个网页：每行一组正确答案，后面每种方法一列，对的打 ✓，错的写出它配成了什么 */
 export function chapterTestHtml(
   book: string,
-  truth: Group[],
+  truth: ChapterGroup[],
   en: Section[],
   zh: Section[],
-  predictions: Record<keyof typeof METHOD_NAMES, Group[]>,
+  predictions: Record<keyof typeof METHOD_NAMES, ChapterGroup[]>,
   options: ChapterOptions,
 ): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

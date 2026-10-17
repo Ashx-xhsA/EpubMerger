@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { embedSorted } from './bench.ts';
-import type { Embedder } from './embed.ts';
+import type { Embedder } from '@epubmerger/core';
 
 describe('embedSorted', () => {
   it('embeds in length order but returns vectors in the original order', async () => {

@@ -1,5 +1,4 @@
-import { cosine } from './embed.ts';
-import { normalize } from './dense.ts';
+import { cosine, normalize } from './vector.ts';
 
 /**
  * 段落配对的动态规划。英文段落排一列、中文段落排一列，从上往下走，

@@ -1,14 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { extractBlocks, parseEpub, type Block } from '@epubmerger/core';
-import { loadEmbedder, MODELS, type Embedder, type ModelKey } from './embed.ts';
-
-/** 以后真正要算向量的块：去掉索引、脚注（结构上确定的非正文，见 trade-off 015）和图片 */
-export function alignableBlocks(blocks: Block[]): Block[] {
-  return blocks.filter(
-    (b) =>
-      b.region !== 'index' && b.region !== 'notes' && b.kind !== 'image' && b.text.trim() !== '',
-  );
-}
+import {
+  alignableBlocks,
+  extractBlocks,
+  parseEpub,
+  type Block,
+  type Embedder,
+} from '@epubmerger/core';
+import { loadEmbedder, MODELS, type ModelKey } from './embed.ts';
 
 export function readBlocks(path: string): Block[] {
   const result = parseEpub(readFileSync(path));

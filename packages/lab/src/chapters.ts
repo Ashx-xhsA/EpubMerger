@@ -1,32 +1,21 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { extractBlocks, parseEpub, splitChapters, type Block } from '@epubmerger/core';
-import { alignableBlocks } from './bench.ts';
+import {
+  chapterSections,
+  extractBlocks,
+  parseEpub,
+  prefillSectionsByOrder,
+  splitChapters,
+  withTitles,
+  type Block,
+  type ChapterMap,
+  type Section,
+} from '@epubmerger/core';
 
 /**
  * 章节对照表：模拟产品里"按顺序预填 + 用户确认"那一步（trade-off 016）。
  * 书按 core 的 splitChapters 切成一节一节，表里每一组写"英文哪几节 ↔ 中文哪几节"，一边为空就是不合并
  */
-
-/** 按目录切出来的一节 */
-export interface Section {
-  title: string;
-  /** 目录里的层级，0 是最外层 */
-  depth: number;
-  /** 这一节里要参与配对的块（不含索引、脚注、图片） */
-  blocks: Block[];
-}
-
-export interface Group {
-  en: number[];
-  zh: number[];
-  /** 只给人看：两边的标题 */
-  titles?: { en: string[]; zh: string[] };
-}
-
-export interface ChapterMap {
-  groups: Group[];
-}
 
 /**
  * 按 core 的 splitChapters 切节（0.6 搬进 core，规则和 0.4b 一样，已有章节表的节号不变），
@@ -36,64 +25,7 @@ export function bookSections(path: string): Section[] {
   const result = parseEpub(readFileSync(path));
   if (!result.ok) throw new Error(`${path}: ${result.error.code}`);
   const all = extractBlocks(result.book).blocks;
-  return splitChapters(result.book, all).chapters.map((c) => ({
-    title: c.beforeToc ? '（目录前）' : c.title || '（空标题）',
-    depth: c.depth,
-    blocks: alignableBlocks(all.slice(c.start, c.end)),
-  }));
-}
-
-/** 按顺序一对一预填。没有块的节和多出来的节各自成一组、另一边为空（不合并） */
-export function prefill(
-  enCount: number,
-  zhCount: number,
-  isEmpty?: (side: 'en' | 'zh', i: number) => boolean,
-): Group[] {
-  const empty = isEmpty ?? (() => false);
-  const en = [...Array(enCount).keys()];
-  const zh = [...Array(zhCount).keys()];
-  const groups: Group[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < en.length || j < zh.length) {
-    if (i < en.length && empty('en', i)) groups.push({ en: [i++], zh: [] });
-    else if (j < zh.length && empty('zh', j)) groups.push({ en: [], zh: [j++] });
-    else if (i < en.length && j < zh.length) groups.push({ en: [i++], zh: [j++] });
-    else if (i < en.length) groups.push({ en: [i++], zh: [] });
-    else groups.push({ en: [], zh: [j++] });
-  }
-  return groups;
-}
-
-/**
- * 检查对照表：每一节恰好出现一次；每组里的节号连续；
- * 组按顺序往前走（后一组的节号都比前一组大），不能交叉。返回发现的问题，没有问题时为空
- */
-export function validate(groups: Group[], enCount: number, zhCount: number): string[] {
-  const problems: string[] = [];
-  for (const side of ['en', 'zh'] as const) {
-    const count = side === 'en' ? enCount : zhCount;
-    const seen = groups.flatMap((g) => g[side]);
-    const sorted = [...seen].sort((a, b) => a - b);
-    if (seen.join() !== sorted.join()) problems.push(`${side}: sections are out of order`);
-    const expected = [...Array(count).keys()];
-    if (sorted.join() !== expected.join()) {
-      const missing = expected.filter((i) => !seen.includes(i));
-      const extra = seen.filter((i, k) => i < 0 || i >= count || seen.indexOf(i) !== k);
-      if (missing.length > 0) problems.push(`${side}: missing ${missing.join(', ')}`);
-      if (extra.length > 0) problems.push(`${side}: duplicate or unknown ${extra.join(', ')}`);
-    }
-    groups.forEach((g, k) => {
-      const ids = g[side];
-      if (ids.some((id, n) => n > 0 && id !== ids[n - 1]! + 1)) {
-        problems.push(`group ${k}: ${side} sections are not consecutive`);
-      }
-    });
-  }
-  groups.forEach((g, k) => {
-    if (g.en.length === 0 && g.zh.length === 0) problems.push(`group ${k} is empty`);
-  });
-  return problems;
+  return chapterSections(splitChapters(result.book, all), all);
 }
 
 /** 开头约 200 个字：中文按字数，英文按单词数（约 50 个词） */
@@ -121,29 +53,6 @@ export function predictedPath(enPath: string): string {
   return join(dirname(enPath), 'chapters.predicted.json');
 }
 
-/** 给每组配上两边的标题，只给人看 */
-export function withTitles(groups: Group[], en: Section[], zh: Section[]): Group[] {
-  return groups.map((g) => ({
-    en: g.en,
-    zh: g.zh,
-    titles: { en: g.en.map((i) => en[i]!.title), zh: g.zh.map((i) => zh[i]!.title) },
-  }));
-}
-
-/**
- * 把组排回书的顺序：有英文的组按英文节号排，只有中文的组插到第一个中文节号比它大的组前面。
- * 按意思预填时，没有内容的节不参与配对、被放在最后，这里把它们放回原位，配对本身不变
- */
-export function inBookOrder(groups: Group[]): Group[] {
-  const out = groups.filter((g) => g.en.length > 0).sort((a, b) => a.en[0]! - b.en[0]!);
-  for (const g of groups) {
-    if (g.en.length > 0) continue;
-    const k = out.findIndex((h) => h.zh.length > 0 && h.zh[0]! > g.zh[0]!);
-    out.splice(k === -1 ? out.length : k, 0, g);
-  }
-  return out;
-}
-
 export function writeMap(path: string, map: ChapterMap): void {
   writeFileSync(path, JSON.stringify(map, null, 2) + '\n');
 }
@@ -152,10 +61,7 @@ export function writeMap(path: string, map: ChapterMap): void {
 export function loadOrCreateMap(enPath: string, en: Section[], zh: Section[]): ChapterMap {
   const path = mapPath(enPath);
   if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8')) as ChapterMap;
-  const groups = prefill(en.length, zh.length, (side, i) =>
-    side === 'en' ? en[i]!.blocks.length === 0 : zh[i]!.blocks.length === 0,
-  );
-  const map = { groups: withTitles(groups, en, zh) };
+  const map = { groups: withTitles(prefillSectionsByOrder(en, zh), en, zh) };
   writeMap(path, map);
   return map;
 }

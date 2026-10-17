@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Embedder } from './embed.ts';
+import type { Embedder } from '@epubmerger/core';
 
 /** 算好的向量存在这里。是从书算出来的，和书一样不进 git */
 export const EMBEDDING_DIR = 'fixtures/.cache/embeddings';

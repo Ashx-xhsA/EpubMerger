@@ -1,5 +1,37 @@
 export const CORE_VERSION = '0.0.0';
 
+export {
+  align,
+  combinedCost,
+  embeddingCost,
+  lengthCost,
+  meanVector,
+  MOVES,
+  normalCdf,
+} from './align/align.ts';
+export type { CostFn, EmbeddingOptions, LengthOptions, Move, Pair } from './align/align.ts';
+export type { Embedder } from './align/embedder.ts';
+export { cosine, normalize } from './align/vector.ts';
+export {
+  alignableBlocks,
+  chapterSections,
+  inBookOrder,
+  prefillByOrder,
+  validateChapterMap,
+  withTitles,
+} from './chapters/map.ts';
+export type { ChapterGroup, ChapterMap, Section } from './chapters/map.ts';
+export {
+  CHAPTER_THRESHOLD,
+  headAndTail,
+  nonEmpty,
+  pairByMeaning,
+  prefillChapters,
+  prefillSectionsByOrder,
+  sectionVectors,
+  toGroups,
+} from './chapters/prefill.ts';
+export type { PrefillOptions, PrefillResult } from './chapters/prefill.ts';
 export { splitChapters } from './chapters/split.ts';
 export type {
   Chapter,

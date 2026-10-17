@@ -1,19 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { env, pipeline } from '@huggingface/transformers';
-import { applyDense, denseFromSafetensors, normalize } from './dense.ts';
-
-/**
- * 把一批文字变成向量。trade-off 011 预留的 embed(texts) 接口：
- * 本地模型、带缓存的版本、将来的远程 API 都实现它，调用方不用管是哪一种
- */
-export interface Embedder {
-  /** 缓存文件名用，同一个模型的不同设置要用不同的名字 */
-  readonly name: string;
-  readonly dim: number;
-  /** 返回的向量和 texts 一一对应，长度都是 1（已归一化），所以点积就是余弦相似度 */
-  embed(texts: string[]): Promise<Float32Array[]>;
-}
+import { normalize, type Embedder } from '@epubmerger/core';
+import { applyDense, denseFromSafetensors } from './dense.ts';
 
 interface ModelSpec {
   id: string;
@@ -99,11 +88,4 @@ async function download(url: string, modelId: string): Promise<Uint8Array> {
     writeFileSync(path, new Uint8Array(await res.arrayBuffer()));
   }
   return readFileSync(path);
-}
-
-/** 两个已归一化向量的余弦相似度，-1 到 1，越大越像 */
-export function cosine(a: Float32Array, b: Float32Array): number {
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += a[i]! * b[i]!;
-  return sum;
 }

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@epubmerger/core": "workspace:*"
+    "@epubmerger/core": "workspace:*",
+    "@huggingface/transformers": "4.3.0"
   }
 }

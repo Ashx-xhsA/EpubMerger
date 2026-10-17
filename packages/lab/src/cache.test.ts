@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withCache } from './cache.ts';
-import type { Embedder } from './embed.ts';
+import type { Embedder } from '@epubmerger/core';
 
 /** 假模型：向量是 [文字长度, 调用次数]，记下每次被要求算哪些文字 */
 function fakeEmbedder() {

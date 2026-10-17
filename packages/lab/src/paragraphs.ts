@@ -1,10 +1,18 @@
 import { existsSync, readFileSync } from 'node:fs';
-import type { Block } from '@epubmerger/core';
-import { align, combinedCost, embeddingCost, lengthCost, type Pair } from './align.ts';
+import {
+  align,
+  combinedCost,
+  cosine,
+  embeddingCost,
+  lengthCost,
+  type Block,
+  type ChapterMap,
+  type Pair,
+} from '@epubmerger/core';
 import { embedSorted } from './bench.ts';
 import { withCache } from './cache.ts';
-import { bookSections, escapeHtml, mapPath, type ChapterMap } from './chapters.ts';
-import { cosine, loadEmbedder, type ModelKey } from './embed.ts';
+import { bookSections, escapeHtml, mapPath } from './chapters.ts';
+import { loadEmbedder, type ModelKey } from './embed.ts';
 
 /**
  * 段落配对实验：在用户确认过的每组章节里，按长度、按意思（embedding）各配一次，

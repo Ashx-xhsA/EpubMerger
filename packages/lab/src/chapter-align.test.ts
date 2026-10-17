@@ -1,7 +1,6 @@
-import type { Block } from '@epubmerger/core';
+import type { Block, Section } from '@epubmerger/core';
 import { describe, expect, it } from 'vitest';
 import { describePrediction, scoreChapters } from './chapter-align.ts';
-import type { Section } from './chapters.ts';
 
 const block: Block = {
   kind: 'para',
