@@ -10,6 +10,7 @@ import {
   detectLanguage,
   extractBlocks,
   parseEpub,
+  splitChapters,
   type Block,
   type TocEntry,
 } from '@epubmerger/core';
@@ -115,5 +116,48 @@ describe.skipIf(langPairs.length === 0)('fixtures: language detection', () => {
     expect(zhLang).toEqual({ kind: 'single', lang: 'zh-Hans' });
     expect(checkLanguagePair(enLang, zhLang)).toEqual({ ok: true, issues: [] });
     expect(detectLanguage(interleave(en, zh)).language).toEqual({ kind: 'uncertain' });
+  });
+});
+
+// 章节：18 本真书的目录都可靠；在内存里删掉目录、或只留前两项（通常是封面、书名页），应该退回按文件切
+const chapterSummary: string[] = [];
+
+describe.skipIf(langPairs.length === 0)('fixtures: chapters', () => {
+  const books18 = langPairs.flatMap((pair) => ['en', 'zh'].map((lang) => `${pair}/${lang}.epub`));
+
+  it.each(books18)('%s', (name) => {
+    const parsed = parseEpub(readFileSync(join(FIXTURES_DIR, name)));
+    if (!parsed.ok) throw new Error(parsed.error.code);
+    const { book } = parsed;
+    const blocks = extractBlocks(book).blocks;
+
+    const result = splitChapters(book, blocks);
+    expect(result.source).toBe('toc');
+    expect(result.warnings).toEqual([]);
+
+    const noToc = { ...book, toc: [] };
+    const missing = splitChapters(noToc, extractBlocks(noToc).blocks);
+    expect(missing.warnings.map((w) => w.code)).toEqual(['TOC_MISSING']);
+    expect(missing.source).toBe('spine');
+
+    const broken = splitChapters({ ...book, toc: book.toc.slice(0, 2) }, blocks);
+    expect(broken.warnings.map((w) => w.code)).toEqual(['TOC_UNRELIABLE']);
+
+    const st = result.tocStats!;
+    const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+    chapterSummary.push(
+      [
+        name,
+        `toc=${result.chapters.length}`,
+        `spine=${missing.chapters.length}`,
+        `unresolved=${pct(st.unresolvedShare)}`,
+        `before=${pct(st.beforeTocShare)}`,
+        `largest=${pct(st.largestShare)}`,
+      ].join('\t'),
+    );
+  });
+
+  afterAll(() => {
+    console.log(['', '---- chapters summary ----', ...chapterSummary.sort()].join('\n'));
   });
 });

@@ -1,11 +1,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { extractBlocks, parseEpub, type Block, type Book, type TocEntry } from '@epubmerger/core';
+import { extractBlocks, parseEpub, splitChapters, type Block } from '@epubmerger/core';
 import { alignableBlocks } from './bench.ts';
 
 /**
  * 章节对照表：模拟产品里"按顺序预填 + 用户确认"那一步（trade-off 016）。
- * 书按目录切成一节一节，表里每一组写"英文哪几节 ↔ 中文哪几节"，一边为空就是不合并
+ * 书按 core 的 splitChapters 切成一节一节，表里每一组写"英文哪几节 ↔ 中文哪几节"，一边为空就是不合并
  */
 
 /** 按目录切出来的一节 */
@@ -28,60 +28,19 @@ export interface ChapterMap {
   groups: Group[];
 }
 
-function flattenToc(entries: TocEntry[], depth: number): { entry: TocEntry; depth: number }[] {
-  return entries.flatMap((entry) => [{ entry, depth }, ...flattenToc(entry.children, depth + 1)]);
-}
-
 /**
- * 目录项从第几块开始：同一文件里 ids 含锚点的块；找不到锚点就是这个文件的第一块；
- * 文件没有块就是后面第一个有块的文件的第一块。和 cli 的 tocStart 一样，0.6 会重写
+ * 按 core 的 splitChapters 切节（0.6 搬进 core，规则和 0.4b 一样，已有章节表的节号不变），
+ * 每节只留参与配对的块
  */
-function tocStart(book: Book, all: Block[], entry: TocEntry): number {
-  if (entry.fragment !== null) {
-    const fragment = entry.fragment;
-    const i = all.findIndex((b) => b.file === entry.href && b.ids.includes(fragment));
-    if (i >= 0) return i;
-  }
-  const spineIndex = new Map(book.spine.map((item, i) => [item.href, i]));
-  const target = spineIndex.get(entry.href);
-  if (target === undefined) return all.length;
-  const i = all.findIndex((b) => (spineIndex.get(b.file) ?? -1) >= target);
-  return i < 0 ? all.length : i;
-}
-
-/**
- * 把块按目录项的起点切成节，第 i 节是 [第 i 个起点, 第 i+1 个起点)。
- * 起点先改成"只能往后走"：往回指的（目录顺序和正文顺序不一致）挪到前一个起点。
- * 这样节不重叠、也不漏；和下一项起点相同的（如"第一部"和它下面的"第 1 章"）是空节。
- * 第一个起点之前的块单独成一节"（目录前）"
- */
-export function splitSections(
-  all: Block[],
-  heads: { title: string; depth: number; start: number }[],
-): Section[] {
-  const starts: number[] = [];
-  for (const h of heads) starts.push(Math.min(all.length, Math.max(h.start, starts.at(-1) ?? 0)));
-  const sections: Section[] = [];
-  const first = starts[0] ?? all.length;
-  if (first > 0) sections.push({ title: '（目录前）', depth: 0, blocks: all.slice(0, first) });
-  heads.forEach((h, i) => {
-    const blocks = all.slice(starts[i], starts[i + 1] ?? all.length);
-    sections.push({ title: h.title || '（空标题）', depth: h.depth, blocks });
-  });
-  return sections.map((s) => ({ ...s, blocks: alignableBlocks(s.blocks) }));
-}
-
 export function bookSections(path: string): Section[] {
   const result = parseEpub(readFileSync(path));
   if (!result.ok) throw new Error(`${path}: ${result.error.code}`);
-  const { book } = result;
-  const all = extractBlocks(book).blocks;
-  const heads = flattenToc(book.toc, 0).map(({ entry, depth }) => ({
-    title: entry.title,
-    depth,
-    start: tocStart(book, all, entry),
+  const all = extractBlocks(result.book).blocks;
+  return splitChapters(result.book, all).chapters.map((c) => ({
+    title: c.beforeToc ? '（目录前）' : c.title || '（空标题）',
+    depth: c.depth,
+    blocks: alignableBlocks(all.slice(c.start, c.end)),
   }));
-  return splitSections(all, heads);
 }
 
 /** 按顺序一对一预填。没有块的节和多出来的节各自成一组、另一边为空（不合并） */

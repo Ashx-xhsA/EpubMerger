@@ -6,9 +6,11 @@ import {
   detectLanguage,
   extractBlocks,
   parseEpub,
+  splitChapters,
   type Block,
   type Book,
   type BookLanguage,
+  type ChapterResult,
   type TocEntry,
 } from '@epubmerger/core';
 
@@ -16,6 +18,7 @@ const USAGE = `Usage:
   pnpm cli merge <en.epub> <zh.epub> -o <out.epub>
   pnpm cli inspect <book.epub>
   pnpm cli blocks <book.epub> [--text]
+  pnpm cli chapters <book.epub> [--ignore-toc]
   pnpm cli lang <a.epub> [b.epub]`;
 
 const { values, positionals } = parseArgs({
@@ -24,6 +27,7 @@ const { values, positionals } = parseArgs({
     output: { type: 'string', short: 'o' },
     version: { type: 'boolean', short: 'v' },
     text: { type: 'boolean' },
+    'ignore-toc': { type: 'boolean' },
   },
 });
 
@@ -40,6 +44,10 @@ if (command === 'inspect' && args.length === 1 && args[0]) {
 
 if (command === 'blocks' && args.length === 1 && args[0]) {
   process.exit(blocks(args[0], values.text === true));
+}
+
+if (command === 'chapters' && args.length === 1 && args[0]) {
+  process.exit(chapters(args[0], values['ignore-toc'] === true));
 }
 
 if (command === 'lang' && (args.length === 1 || args.length === 2)) {
@@ -164,16 +172,8 @@ function blocks(path: string, withText: boolean): number {
     console.log(`  ${f.href}  ${f.region}${why} · ${f.blockCount} · ${chars(inFile)}${extra}`);
   }
 
-  console.log('\n按目录项（只数正文）：块数 · 字数');
-  const entries = flattenToc(book.toc, 0);
-  const starts = entries.map(({ entry }) => tocStart(book, all, entry));
-  entries.forEach(({ entry, depth }, i) => {
-    const start = starts[i] ?? all.length;
-    const end = Math.max(start, starts[i + 1] ?? all.length);
-    const inEntry = all.slice(start, end).filter((b) => b.region === 'body');
-    const title = entry.title || '（空标题）';
-    console.log(`${'  '.repeat(depth + 1)}${title} · ${inEntry.length} · ${chars(inEntry)}`);
-  });
+  console.log('\n按章节（只数正文）：块数 · 字数');
+  printChapters(splitChapters(book, all), all);
 
   if (withText) {
     console.log('\n逐块：序号 kind region 开头');
@@ -190,25 +190,35 @@ function chars(blocks: Block[]): number {
   return blocks.reduce((n, b) => n + b.text.replace(/\s/g, '').length, 0);
 }
 
-function flattenToc(entries: TocEntry[], depth: number): { entry: TocEntry; depth: number }[] {
-  return entries.flatMap((entry) => [{ entry, depth }, ...flattenToc(entry.children, depth + 1)]);
+/** 打印切章节的结果：切法、警告、目录的几个数字，每节的块数、字数；ignoreToc 时假装没有目录 */
+function chapters(path: string, ignoreToc: boolean): number {
+  const result = parseEpub(readFileSync(path));
+  if (!result.ok) {
+    console.log(`✗ ${result.error.code}：${result.error.message}`);
+    return 1;
+  }
+  const book = ignoreToc ? { ...result.book, toc: [] } : result.book;
+  const all = extractBlocks(book).blocks;
+  printChapters(splitChapters(book, all), all);
+  return 0;
 }
 
-/**
- * 目录项从第几块开始：同一文件里 ids 含锚点的块；找不到锚点就是这个文件的第一块；
- * 文件没有块就是后面第一个有块的文件的第一块
- */
-function tocStart(book: Book, all: Block[], entry: TocEntry): number {
-  if (entry.fragment !== null) {
-    const fragment = entry.fragment;
-    const i = all.findIndex((b) => b.file === entry.href && b.ids.includes(fragment));
-    if (i >= 0) return i;
+function printChapters(result: ChapterResult, all: Block[]): void {
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  console.log(`切法：${result.source}，共 ${result.chapters.length} 节`);
+  for (const w of result.warnings) console.log(`⚠ ${w.code}：${w.message}`);
+  const st = result.tocStats;
+  if (st !== null) {
+    console.log(
+      `目录：${st.entries} 项 · 指向 spine 以外 ${pct(st.unresolvedShare)} · ` +
+        `目录前 ${pct(st.beforeTocShare)} · 最大一节 ${pct(st.largestShare)}`,
+    );
   }
-  const spineIndex = new Map(book.spine.map((item, i) => [item.href, i]));
-  const target = spineIndex.get(entry.href);
-  if (target === undefined) return all.length;
-  const i = all.findIndex((b) => (spineIndex.get(b.file) ?? -1) >= target);
-  return i < 0 ? all.length : i;
+  for (const c of result.chapters) {
+    const inChapter = all.slice(c.start, c.end).filter((b) => b.region === 'body');
+    const title = c.beforeToc ? '（目录前）' : c.title || '（空标题）';
+    console.log(`${'  '.repeat(c.depth + 1)}${title} · ${inChapter.length} · ${chars(inChapter)}`);
+  }
 }
 
 function countEntries(entries: TocEntry[]): number {

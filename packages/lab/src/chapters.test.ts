@@ -6,7 +6,6 @@ import {
   mapHtml,
   prefill,
   preview,
-  splitSections,
   validate,
   withTitles,
 } from './chapters.ts';
@@ -14,60 +13,6 @@ import {
 function block(text: string, region: Block['region'] = 'body'): Block {
   return { kind: 'para', text, html: '', file: 'a.xhtml', ids: [], className: '', region };
 }
-
-const texts = (blocks: Block[]) => blocks.map((b) => b.text);
-
-describe('splitSections', () => {
-  const all = ['cover', 'a1', 'a2', 'b1', 'c1', 'c2'].map((t) => block(t));
-
-  it('cuts at each start and puts what comes before the first entry in its own section', () => {
-    const sections = splitSections(all, [
-      { title: 'A', depth: 0, start: 1 },
-      { title: 'B', depth: 0, start: 3 },
-      { title: 'C', depth: 0, start: 4 },
-    ]);
-    expect(sections.map((s) => [s.title, texts(s.blocks)])).toEqual([
-      ['（目录前）', ['cover']],
-      ['A', ['a1', 'a2']],
-      ['B', ['b1']],
-      ['C', ['c1', 'c2']],
-    ]);
-  });
-
-  it('gives a parent that starts where its first child starts an empty section', () => {
-    const sections = splitSections(all, [
-      { title: 'Part 1', depth: 0, start: 1 },
-      { title: 'Ch 1', depth: 1, start: 1 },
-      { title: 'Ch 2', depth: 1, start: 3 },
-    ]);
-    expect(sections.slice(1).map((s) => [s.title, texts(s.blocks)])).toEqual([
-      ['Part 1', []],
-      ['Ch 1', ['a1', 'a2']],
-      ['Ch 2', ['b1', 'c1', 'c2']],
-    ]);
-  });
-
-  it('never overlaps when an entry points backwards', () => {
-    const sections = splitSections(all, [
-      { title: 'A', depth: 0, start: 0 },
-      { title: 'C', depth: 0, start: 4 },
-      { title: 'B', depth: 0, start: 3 },
-    ]);
-    expect(sections.map((s) => [s.title, texts(s.blocks)])).toEqual([
-      ['A', ['cover', 'a1', 'a2', 'b1']],
-      ['C', []],
-      ['B', ['c1', 'c2']],
-    ]);
-  });
-
-  it('leaves out index and note blocks', () => {
-    const sections = splitSections(
-      [block('x'), block('note', 'notes'), block('idx', 'index')],
-      [{ title: 'A', depth: 0, start: 0 }],
-    );
-    expect(texts(sections[0]!.blocks)).toEqual(['x']);
-  });
-});
 
 describe('prefill', () => {
   it('pairs in order and leaves the extra sections unmerged', () => {
