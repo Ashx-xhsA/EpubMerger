@@ -157,18 +157,47 @@ export function mapPath(enPath: string): string {
   return join(dirname(enPath), 'chapters.json');
 }
 
+/** 程序预填的那份表：确认前存一份，之后不再改，用来和确认过的表比 */
+export function predictedPath(enPath: string): string {
+  return join(dirname(enPath), 'chapters.predicted.json');
+}
+
+/** 给每组配上两边的标题，只给人看 */
+export function withTitles(groups: Group[], en: Section[], zh: Section[]): Group[] {
+  return groups.map((g) => ({
+    en: g.en,
+    zh: g.zh,
+    titles: { en: g.en.map((i) => en[i]!.title), zh: g.zh.map((i) => zh[i]!.title) },
+  }));
+}
+
+/**
+ * 把组排回书的顺序：有英文的组按英文节号排，只有中文的组插到第一个中文节号比它大的组前面。
+ * 按意思预填时，没有内容的节不参与配对、被放在最后，这里把它们放回原位，配对本身不变
+ */
+export function inBookOrder(groups: Group[]): Group[] {
+  const out = groups.filter((g) => g.en.length > 0).sort((a, b) => a.en[0]! - b.en[0]!);
+  for (const g of groups) {
+    if (g.en.length > 0) continue;
+    const k = out.findIndex((h) => h.zh.length > 0 && h.zh[0]! > g.zh[0]!);
+    out.splice(k === -1 ? out.length : k, 0, g);
+  }
+  return out;
+}
+
+export function writeMap(path: string, map: ChapterMap): void {
+  writeFileSync(path, JSON.stringify(map, null, 2) + '\n');
+}
+
 /** 读对照表；不存在就按顺序预填一份写进去。已有的文件不会被覆盖 */
 export function loadOrCreateMap(enPath: string, en: Section[], zh: Section[]): ChapterMap {
   const path = mapPath(enPath);
   if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8')) as ChapterMap;
   const groups = prefill(en.length, zh.length, (side, i) =>
     side === 'en' ? en[i]!.blocks.length === 0 : zh[i]!.blocks.length === 0,
-  ).map((g) => ({
-    ...g,
-    titles: { en: g.en.map((i) => en[i]!.title), zh: g.zh.map((i) => zh[i]!.title) },
-  }));
-  const map = { groups };
-  writeFileSync(path, JSON.stringify(map, null, 2) + '\n');
+  );
+  const map = { groups: withTitles(groups, en, zh) };
+  writeMap(path, map);
   return map;
 }
 

@@ -7,8 +7,12 @@ import {
   formatMap,
   loadOrCreateMap,
   mapHtml,
+  inBookOrder,
   mapPath,
+  predictedPath,
   validate,
+  withTitles,
+  writeMap,
 } from './chapters.ts';
 import { dumpReview, reviewHtml, type Verdict } from './review.ts';
 import { chapterTestHtml, predictAll, scoreChapters, sectionVectors } from './chapter-align.ts';
@@ -32,7 +36,7 @@ const MODEL_KEYS = Object.keys(MODELS).filter(isModelKey);
 const USAGE = `Usage:
   pnpm lab sim [--model ${MODEL_KEYS.join('|')}] <text> <text> [...]
   pnpm lab bench [--model ${MODEL_KEYS.join('|')}|all] <book.epub> [...]
-  pnpm lab chapters <en.epub> <zh.epub> [--html]
+  pnpm lab chapters [--prefill order|meaning] [--threshold 0.75] <en.epub> <zh.epub> [--html]
   pnpm lab paragraphs [--model ${MODEL_KEYS.join('|')}] [--threshold 0.75] [--lambda 200] <en.epub> <zh.epub>
   pnpm lab compare [--threshold 0.75] [--lambdas 20,50,100] <pair-dir> [...]
   pnpm lab chapter-test [--thresholds 0.75,0.8,0.85] [--lambdas 20,50,100] <pair-dir> [...]`;
@@ -42,6 +46,7 @@ const { values, positionals } = parseArgs({
   options: {
     model: { type: 'string', short: 'm', default: 'e5' },
     html: { type: 'boolean' },
+    prefill: { type: 'string', default: 'order' },
     threshold: { type: 'string', default: '0.75' },
     lambda: { type: 'string', default: '200' },
     lambdas: { type: 'string', default: '20,50,100' },
@@ -66,7 +71,15 @@ if (command === 'bench' && args.length >= 1 && (model === 'all' || isModelKey(mo
     }
   }
   console.log(benchSummary(results));
-} else if (command === 'chapters' && args.length === 2 && args[0] && args[1]) {
+} else if (
+  command === 'chapters' &&
+  args.length === 2 &&
+  args[0] &&
+  args[1] &&
+  (values.prefill === 'order' || values.prefill === 'meaning') &&
+  isModelKey(model)
+) {
+  if (values.prefill === 'meaning') await prefillByMeaning(args[0], args[1], model);
   process.exit(chapters(args[0], args[1], values.html === true));
 } else if (
   command === 'paragraphs' &&
@@ -114,6 +127,29 @@ function chapters(enPath: string, zhPath: string, html: boolean): number {
     return 1;
   }
   return 0;
+}
+
+/**
+ * 还没有章节表时，按意思预填（门槛读 --threshold）：同样的表写两份，
+ * chapters.predicted.json 是程序的答案、之后不再改，chapters.json 是给人确认时改的草稿
+ */
+async function prefillByMeaning(enPath: string, zhPath: string, key: ModelKey): Promise<void> {
+  if (existsSync(mapPath(enPath))) return;
+  const en = bookSections(enPath);
+  const zh = bookSections(zhPath);
+  const embedder = withCache(await loadEmbedder(key));
+  const { meaning } = predictAll(
+    en,
+    zh,
+    await sectionVectors(en, embedder),
+    await sectionVectors(zh, embedder),
+    // 只取按意思的结果，lambda 用不到
+    { threshold: Number(values.threshold), lambda: Number(values.lambda) },
+  );
+  const map = { groups: withTitles(inBookOrder(meaning), en, zh) };
+  writeMap(predictedPath(enPath), map);
+  writeMap(mapPath(enPath), map);
+  console.log(`按意思预填：${predictedPath(enPath)}（之后不再改）`);
 }
 
 /**
