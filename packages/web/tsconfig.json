@@ -1,0 +1,12 @@
+{
+  // web 在浏览器里运行，需要 DOM 类型和 JSX。
+  // vite.config.ts 在 Node 里运行，也放在这里一起检查，所以加载 node 类型；
+  // vite/client 让 TypeScript 认识 import 进来的 .css 等文件
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "vite.config.ts"]
+}

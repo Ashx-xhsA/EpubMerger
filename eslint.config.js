@@ -1,5 +1,7 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -19,5 +21,11 @@ export default tseslint.config(
         URL: 'readonly',
       },
     },
+  },
+  {
+    // 网页：在浏览器里运行，检查 React Hooks 的用法
+    files: ['packages/web/src/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+    ...reactHooks.configs.flat['recommended-latest'],
   },
 );
