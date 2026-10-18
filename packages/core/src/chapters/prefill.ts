@@ -1,10 +1,10 @@
-import { align, embeddingCost, meanVector, type Pair } from '../align/align.ts';
+import { align, embeddingCost, lengthCost, meanVector, type Pair } from '../align/align.ts';
 import type { Embedder } from '../align/embedder.ts';
 import { inBookOrder, prefillByOrder, type ChapterGroup, type Section } from './map.ts';
 
 /**
  * 章节表的预填：有模型时按意思（0.4b、0.4a 验证过，正文章节全部配对正确），
- * 没有模型时按顺序一对一。预填只是草稿，最后由用户确认
+ * 没有模型时按长度或按顺序。预填只是草稿，最后由用户确认
  */
 
 /** 按意思配对的门槛：相似度高于它才值得配（0.4b 定的，0.4a 在新书上没改） */
@@ -79,25 +79,50 @@ export function pairByMeaning(
   return toGroups(align(enIds.length, zhIds.length, cost), enIds, zhIds, en, zh);
 }
 
+/** 一节的字数，不算空白 */
+export function sectionChars(s: Section): number {
+  return s.blocks.reduce((n, b) => n + b.text.replace(/\s/g, '').length, 0);
+}
+
+/**
+ * 按长度配对（Gale-Church，和段落用同一个长度代价），不需要模型。
+ * 0.4a / 0.4b 里用户要改的行比按顺序少（9 本合计 93 vs 170）。结果没有排回书的顺序，空节在最后
+ */
+export function pairByLength(en: Section[], zh: Section[]): ChapterGroup[] {
+  const enIds = nonEmpty(en);
+  const zhIds = nonEmpty(zh);
+  const cost = lengthCost(
+    enIds.map((i) => sectionChars(en[i]!)),
+    zhIds.map((j) => sectionChars(zh[j]!)),
+  );
+  return toGroups(align(enIds.length, zhIds.length, cost), enIds, zhIds, en, zh);
+}
+
 export interface PrefillOptions {
-  /** 不给时按顺序预填 */
+  /** 不给时按 fallback 预填 */
   embedder?: Embedder;
   threshold?: number;
+  /** 没有模型时用哪种，默认按顺序 */
+  fallback?: 'order' | 'length';
 }
 
 export interface PrefillResult {
-  method: 'meaning' | 'order';
+  method: 'meaning' | 'length' | 'order';
   groups: ChapterGroup[];
 }
 
-/** 预填章节表：有 embedder 时按意思，再排回书的顺序；没有时按顺序 */
+/** 预填章节表：有 embedder 时按意思；没有时按 fallback（按长度或按顺序）。都按书的顺序排 */
 export async function prefillChapters(
   en: Section[],
   zh: Section[],
   options: PrefillOptions = {},
 ): Promise<PrefillResult> {
-  const { embedder, threshold = CHAPTER_THRESHOLD } = options;
-  if (embedder === undefined) return { method: 'order', groups: prefillSectionsByOrder(en, zh) };
+  const { embedder, threshold = CHAPTER_THRESHOLD, fallback = 'order' } = options;
+  if (embedder === undefined) {
+    return fallback === 'length'
+      ? { method: 'length', groups: inBookOrder(pairByLength(en, zh)) }
+      : { method: 'order', groups: prefillSectionsByOrder(en, zh) };
+  }
   const enVecs = await sectionVectors(en, embedder);
   const zhVecs = await sectionVectors(zh, embedder);
   return {

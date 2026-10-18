@@ -3,7 +3,13 @@ import type { Embedder } from '../align/embedder.ts';
 import { normalize } from '../align/vector.ts';
 import type { Block } from '../extract/types.ts';
 import type { Section } from './map.ts';
-import { headAndTail, prefillChapters, sectionVectors } from './prefill.ts';
+import {
+  headAndTail,
+  pairByLength,
+  prefillChapters,
+  sectionChars,
+  sectionVectors,
+} from './prefill.ts';
 
 function block(text: string): Block {
   return {
@@ -53,6 +59,20 @@ describe('sectionVectors', () => {
   });
 });
 
+// 中文把第二章拆成了两节；按顺序会从第二章起错开一位
+const enByLength = [
+  section('Title'),
+  section('One', 'a'.repeat(1000)),
+  section('Two', 'b'.repeat(4000)),
+  section('Three', 'c'.repeat(2000)),
+];
+const zhByLength = [
+  section('第一章', '甲'.repeat(1000)),
+  section('第二章（上）', '乙'.repeat(2000)),
+  section('第二章（下）', '乙'.repeat(2000)),
+  section('第三章', '丙'.repeat(2000)),
+];
+
 describe('prefillChapters', () => {
   // 英文：扉页（空）、译文没有的前言、三章；中文：译者序、三章
   const en = [
@@ -87,5 +107,32 @@ describe('prefillChapters', () => {
     expect(result.method).toBe('order');
     expect(result.groups[0]).toEqual({ en: [0], zh: [] });
     expect(result.groups[1]).toEqual({ en: [1], zh: [0] });
+  });
+
+  it('pairs by length when asked, without an embedder, in book order', async () => {
+    const result = await prefillChapters(enByLength, zhByLength, { fallback: 'length' });
+    expect(result.method).toBe('length');
+    expect(result.groups).toEqual([
+      { en: [0], zh: [] },
+      { en: [1], zh: [0] },
+      { en: [2], zh: [1, 2] },
+      { en: [3], zh: [3] },
+    ]);
+  });
+
+  it('ignores the fallback when an embedder is given', async () => {
+    const result = await prefillChapters(en, zh, { embedder: fake, fallback: 'length' });
+    expect(result.method).toBe('meaning');
+  });
+});
+
+describe('pairByLength', () => {
+  it('counts characters without whitespace', () => {
+    expect(sectionChars(section('a', 'ab c', ' d\n'))).toBe(4);
+  });
+
+  it('puts empty sections last, unmerged', () => {
+    const groups = pairByLength(enByLength, zhByLength);
+    expect(groups.at(-1)).toEqual({ en: [0], zh: [] });
   });
 });

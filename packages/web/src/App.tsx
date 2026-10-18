@@ -3,17 +3,21 @@ import {
   IconBulb,
   IconCheck,
   IconDownload,
+  IconLoader2,
   IconLock,
 } from '@tabler/icons-react';
 import { checkLanguagePair, MAX_FILE_BYTES } from '@epubmerger/core';
 import type { LanguageIssue } from '@epubmerger/core';
 import { useEffect, useRef, useState } from 'react';
+import { componentProblems, components, groupsFromLinks, linksFromGroups } from './chapterTable.ts';
+import type { Empties, Link } from './chapterTable.ts';
 import { BookSlot } from './components/BookSlot.tsx';
 import type { SlotIssue, SlotState } from './components/BookSlot.tsx';
+import { ChapterTable } from './components/ChapterTable.tsx';
 import { IssueNotice } from './components/IssueNotice.tsx';
 import { LanguageSwitch } from './components/LanguageSwitch.tsx';
 import { LayoutPicker } from './components/LayoutPicker.tsx';
-import type { Layout, MergeProgress, MergeStats } from './pipeline.ts';
+import type { Layout, MergeProgress, MergeStats, PreparedChapters } from './pipeline.ts';
 import { languageName, useLocale } from './strings/index.tsx';
 import type { Strings } from './strings/en.ts';
 import { call, callback, cancel, CANCELLED } from './worker-client.ts';
@@ -27,6 +31,14 @@ type MergeState =
   | { status: 'done'; url: string; fileName: string; stats: MergeStats }
   /** 错误提示是按当前界面语言生成文字的函数，切换语言后跟着变 */
   | { status: 'error'; message: (t: Strings) => string };
+
+/**
+ * 章节表。key 是"第一本 id > 第二本 id"，交换、换书后 key 变了，旧表就不用了、重新预填。
+ * initial 是程序预填的那一版（"恢复预填"用），links 是用户改过的
+ */
+type ChapterState =
+  | { key: string; status: 'ready'; info: PreparedChapters; initial: Link[]; links: Link[] }
+  | { key: string; status: 'error'; message: string };
 
 let nextId = 0;
 
@@ -58,6 +70,9 @@ export function App() {
   const [merge, setMerge] = useState<MergeState>({ status: 'idle' });
   /** 点过"仍然继续"的那两本书（两个 id 排好序），换了书就不算数；交换不影响 */
   const [continuedFor, setContinuedFor] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<ChapterState | null>(null);
+  /** 已经让 Worker 去准备章节表的 key，避免每次渲染都重复调用 */
+  const requested = useRef<string | null>(null);
 
   // 封面网址：上一次画到页面上的两个框里有、这一次没有的（移除、换书），释放掉。
   // 交换只是换位置，网址还在，不会被释放
@@ -181,6 +196,55 @@ export function App() {
   const pairKey = bothReady ? [first.id, second.id].sort((x, y) => x - y).join('-') : null;
   const needsContinue = warnings.length > 0 && errors.length === 0 && continuedFor !== pairKey;
 
+  // 两本读好、语言没有 error 时准备章节表。顺序也算进 key：交换后第一本变了，表要重新预填
+  const orderKey = bothReady && errors.length === 0 ? `${first.id}>${second.id}` : null;
+  useEffect(() => {
+    const [a, b] = slots;
+    if (orderKey === null || requested.current === orderKey) return;
+    if (a.status !== 'ready' || b.status !== 'ready') return;
+    requested.current = orderKey;
+    const key = orderKey;
+    call((api) =>
+      api.prepareChapters(
+        { bytes: a.bytes, fileName: a.fileName },
+        { bytes: b.bytes, fileName: b.fileName },
+      ),
+    ).then(
+      (result) => {
+        if (result === CANCELLED) {
+          // Worker 被换掉了（取消合并），下次渲染时重新请求
+          if (requested.current === key) requested.current = null;
+        } else if (!result.ok) {
+          setChapters({ key, status: 'error', message: result.message });
+        } else {
+          const info = result.chapters;
+          const initial = linksFromGroups(info.groups);
+          setChapters({ key, status: 'ready', info, initial, links: initial });
+        }
+      },
+      (error: unknown) => {
+        console.error(error);
+        setChapters({ key, status: 'error', message: String(error) });
+      },
+    );
+  }, [orderKey, slots]);
+
+  /** 当前这两本书（按现在的顺序）的章节表；还在准备时是 null */
+  const table = chapters !== null && chapters.key === orderKey ? chapters : null;
+  const empties = (info: PreparedChapters): Empties => ({
+    first: info.first.map((s) => s.empty),
+    second: info.second.map((s) => s.empty),
+  });
+  const chaptersReady =
+    table?.status === 'ready' &&
+    componentProblems(components(table.links, empties(table.info))).length === 0;
+
+  /** 改了章节表：之前的合并结果作废 */
+  const onLinks = (links: Link[]) => {
+    resetMerge();
+    setChapters((c) => (c?.status === 'ready' ? { ...c, links } : c));
+  };
+
   /** 这张卡片上的问题：挂在这本或两本上的，error 优先 */
   const slotIssue = (side: 'a' | 'b'): SlotIssue | null => {
     const issue = [...errors, ...warnings].find(
@@ -193,6 +257,11 @@ export function App() {
 
   const onMerge = async () => {
     if (first.status !== 'ready' || second.status !== 'ready') return;
+    if (table?.status !== 'ready') return;
+    const groups = groupsFromLinks(table.links, empties(table.info), {
+      first: table.info.first.length,
+      second: table.info.second.length,
+    });
     resetMerge();
     setMerge({ status: 'running', progress: null });
     const onProgress = (progress: MergeProgress) =>
@@ -201,7 +270,7 @@ export function App() {
       api.mergeBooks(
         { bytes: first.bytes, fileName: first.fileName },
         { bytes: second.bytes, fileName: second.fileName },
-        { layout },
+        { layout, groups },
         callback(onProgress),
       ),
     );
@@ -285,6 +354,43 @@ export function App() {
           />
         </div>
 
+        {bothReady && errors.length === 0 && (
+          <div className="mt-7">
+            {[first, second].flatMap((slot) => {
+              const { warning, count } = slot.summary.chapters;
+              return warning === null
+                ? []
+                : [
+                    <IssueNotice
+                      key={slot.id}
+                      level="warning"
+                      messages={[t.tocNotice[warning](slot.summary.title, count)]}
+                    />,
+                  ];
+            })}
+            {table === null ? (
+              <p className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
+                <IconLoader2 size={18} className="animate-spin" />
+                {t.chapters.preparing}
+              </p>
+            ) : table.status === 'error' ? (
+              <p className="py-4 text-center text-sm text-red-600">
+                {t.chapters.prepareFailed(table.message)}
+              </p>
+            ) : (
+              <ChapterTable
+                first={table.info.first}
+                second={table.info.second}
+                firstTitle={first.summary.title}
+                secondTitle={second.summary.title}
+                links={table.links}
+                onChange={onLinks}
+                onRestore={() => onLinks(table.initial)}
+              />
+            )}
+          </div>
+        )}
+
         <div className="mt-7 text-center">
           {bothReady &&
             (errors.length > 0 ? (
@@ -304,18 +410,21 @@ export function App() {
             {needsContinue ? (
               <button
                 type="button"
+                disabled={!chaptersReady}
                 onClick={() => {
                   setContinuedFor(pairKey);
                   void onMerge();
                 }}
-                className="h-11 rounded-lg border-[1.5px] border-amber-500 bg-white px-10 text-base font-medium text-amber-800 hover:bg-amber-50"
+                className="h-11 rounded-lg border-[1.5px] border-amber-500 bg-white px-10 text-base font-medium text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t.continueAnyway}
               </button>
             ) : (
               <button
                 type="button"
-                disabled={!bothReady || errors.length > 0 || merge.status === 'running'}
+                disabled={
+                  !bothReady || errors.length > 0 || !chaptersReady || merge.status === 'running'
+                }
                 onClick={() => void onMerge()}
                 className="h-11 rounded-lg bg-blue-600 px-10 text-base font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
               >

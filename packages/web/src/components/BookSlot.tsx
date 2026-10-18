@@ -167,12 +167,19 @@ export function BookSlot({ position, state, layout, issue, onFiles, onRemove }: 
           <p className="max-w-full truncate text-[13px] text-gray-500">
             {state.summary.authors.join(', ')}
           </p>
-          <span className={`mt-1.5 rounded-md px-2.5 py-0.5 text-xs ${tag}`}>
-            {issue?.label ??
-              (state.summary.language.kind === 'single'
-                ? languageName(t, state.summary.language.lang)
-                : t.languageUnclear)}
-          </span>
+          <div className="mt-1.5 flex flex-wrap justify-center gap-1.5">
+            <span className={`rounded-md px-2.5 py-0.5 text-xs ${tag}`}>
+              {issue?.label ??
+                (state.summary.language.kind === 'single'
+                  ? languageName(t, state.summary.language.lang)
+                  : t.languageUnclear)}
+            </span>
+            {state.summary.chapters.warning !== null && (
+              <span className="rounded-md bg-amber-50 px-2.5 py-0.5 text-xs text-amber-800">
+                {t.tocTag[state.summary.chapters.warning]}
+              </span>
+            )}
+          </div>
         </>
       )}
     </div>

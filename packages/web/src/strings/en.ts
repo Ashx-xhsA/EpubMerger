@@ -1,6 +1,6 @@
 // 界面上所有给人看的文字。zh.ts 的类型就是这里的类型，漏翻一条 TypeScript 就报错
 
-import type { LanguageIssueCode, ParseErrorCode } from '@epubmerger/core';
+import type { ChapterWarningCode, LanguageIssueCode, ParseErrorCode } from '@epubmerger/core';
 
 /** 读书失败的原因。UNEXPECTED 是 Worker 里抛出了意外的错误，不是 core 的错误码 */
 export type LoadErrorCode = ParseErrorCode | 'UNEXPECTED';
@@ -76,7 +76,6 @@ export const en = {
   merging: 'Merging…',
   progress: {
     reading: 'Reading the books…',
-    chapters: 'Matching chapters…',
     paragraphs: (done: number, total: number) => `Matching paragraphs ${done}/${total}…`,
     generating: 'Building the ePub…',
   },
@@ -107,6 +106,47 @@ export const en = {
     },
   } as Record<LanguageIssueCode, LanguageIssueText>,
   continueAnyway: 'Continue anyway',
+
+  tocTag: {
+    TOC_MISSING: 'No usable contents',
+    TOC_UNRELIABLE: 'Incomplete contents',
+  } as Record<ChapterWarningCode, string>,
+  tocNotice: {
+    TOC_MISSING: (title: string, count: number) =>
+      count === 1
+        ? `“${title}” has no usable table of contents, so the whole book is treated as one section. Matching will be less accurate; an edition with a table of contents works better.`
+        : `“${title}” has no usable table of contents, so it was split by file into ${count} sections. Matching will be less accurate; an edition with a table of contents works better.`,
+    TOC_UNRELIABLE: (title: string, count: number) =>
+      count === 1
+        ? `The table of contents of “${title}” is incomplete, so the whole book is treated as one section. Matching will be less accurate; an edition with a complete table of contents works better.`
+        : `The table of contents of “${title}” is incomplete, so it was split by file into ${count} sections. Matching will be less accurate; an edition with a complete table of contents works better.`,
+  } as Record<ChapterWarningCode, (title: string, count: number) => string>,
+
+  chapters: {
+    title: 'Chapter matching',
+    hint: 'We matched the chapters by length to start with — check before merging. Blue sections are matched with the one beside them. Grey dashed ones are unmatched: on the left they stay in the book without a translation; on the right they are left out.',
+    preparing: 'Sorting out the chapters…',
+    prepareFailed: (message: string) => `Couldn't read the chapters: ${message}`,
+    restore: 'Reset',
+    collapse: 'Hide',
+    expand: 'Show',
+    originalOnly: 'original only',
+    leftOut: 'left out',
+    chars: (n: number) => `${n.toLocaleString('en')} chars`,
+    emptySection: 'no text',
+    showEmpty: (n: number) => `Show ${n} ${n === 1 ? 'section' : 'sections'} without text`,
+    hideEmpty: 'Hide sections without text',
+    idle: 'To change a match, click a section on one side, then its match on the other. Click × in the middle to split a pair.',
+    selected: (title: string, isFirst: boolean) =>
+      `Selected “${title}”. Now click its match on the ${isFirst ? 'right' : 'left'}, or click it again to cancel.`,
+    paired: (a: string, b: string, dropped: number) =>
+      `Matched “${a}” ↔ “${b}”.${dropped > 0 ? ` Removed ${dropped} conflicting ${dropped === 1 ? 'match' : 'matches'}.` : ''}`,
+    unpaired: 'Split apart; both sides are now left out.',
+    undo: 'Undo',
+    unpair: 'Split this pair',
+    problems:
+      'The groups in red cross over or have a gap: sections on both sides must be consecutive and go down in order. Fix them before merging.',
+  },
   mergeFailed: (message: string) => `Merge failed: ${message}`,
   done: (pairs: number, secs: string) => `Matched ${pairs} paragraph pairs in ${secs} s`,
   download: 'Download bilingual ePub',

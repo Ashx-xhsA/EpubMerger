@@ -25,9 +25,11 @@ export {
   CHAPTER_THRESHOLD,
   headAndTail,
   nonEmpty,
+  pairByLength,
   pairByMeaning,
   prefillChapters,
   prefillSectionsByOrder,
+  sectionChars,
   sectionVectors,
   toGroups,
 } from './chapters/prefill.ts';

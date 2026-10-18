@@ -55,7 +55,6 @@ export const zh: Strings = {
   merging: '合并中…',
   progress: {
     reading: '正在读取…',
-    chapters: '正在配对章节…',
     paragraphs: (done, total) => `正在配对段落 ${done}/${total}…`,
     generating: '正在生成…',
   },
@@ -84,6 +83,47 @@ export const zh: Strings = {
     },
   },
   continueAnyway: '仍然继续',
+
+  tocTag: {
+    TOC_MISSING: '没有可用目录',
+    TOC_UNRELIABLE: '目录不完整',
+  },
+  tocNotice: {
+    TOC_MISSING: (title, count) =>
+      count === 1
+        ? `《${title}》没有可用的目录，整本书当成了一节，对齐会不太准。最好换一个带目录的版本。`
+        : `《${title}》没有可用的目录，已按文件分成 ${count} 节，对齐会不太准。最好换一个带目录的版本。`,
+    TOC_UNRELIABLE: (title, count) =>
+      count === 1
+        ? `《${title}》的目录不完整，整本书当成了一节，对齐会不太准。最好换一个目录完整的版本。`
+        : `《${title}》的目录不完整，已按文件分成 ${count} 节，对齐会不太准。最好换一个目录完整的版本。`,
+  },
+
+  chapters: {
+    title: '章节对照表',
+    hint: '程序已经按长度先配了一遍，合并前请检查。蓝色是配上的，同一行左右对应。灰色虚线框是没配上的：左边的照样留在书里、只有原文，右边的不收录。',
+    preparing: '正在整理章节…',
+    prepareFailed: (message) => `读取章节失败：${message}`,
+    restore: '恢复预填',
+    collapse: '收起',
+    expand: '展开',
+    originalOnly: '只保留原文',
+    leftOut: '不收录',
+    chars: (n) => `${n.toLocaleString('zh')} 字`,
+    emptySection: '没有正文',
+    showEmpty: (n) => `显示 ${n} 个没有正文的节`,
+    hideEmpty: '收起没有正文的节',
+    idle: '要改配对：先点一边的一节，再点另一边对应的那一节。点中间的 × 拆开一对。',
+    selected: (title, isFirst) =>
+      `已选中「${title}」。现在点${isFirst ? '右' : '左'}边对应的那一节；再点它一次取消选中。`,
+    paired: (a, b, dropped) =>
+      `已配对：「${a}」↔「${b}」。${dropped > 0 ? `另外取消了 ${dropped} 条和它冲突的配对。` : ''}`,
+    unpaired: '已拆开，两边都改成不合并。',
+    undo: '撤销',
+    unpair: '拆开这一对',
+    problems:
+      '标红的组交叉了，或者中间隔着别的节：两边的节都要连续，并且从上到下依次对应。改好之前不能合并。',
+  },
   mergeFailed: (message: string) => `合并失败：${message}`,
   done: (pairs: number, secs: string) => `配成 ${pairs} 对段落，用时 ${secs} 秒`,
   download: '下载双语 ePub',

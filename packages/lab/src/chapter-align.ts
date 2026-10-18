@@ -4,7 +4,9 @@ import {
   lengthCost,
   embeddingCost,
   nonEmpty,
+  pairByLength,
   prefillSectionsByOrder,
+  sectionChars,
   toGroups,
   type ChapterGroup,
   type Section,
@@ -13,12 +15,8 @@ import {
 /**
  * 章节自动配对测试：不靠人，程序自己配章节，和用户确认过的章节表比，看能对多少。
  * 四种方法：按顺序预填、按长度、按意思、两者合并。都用段落配对那套走法（1:1、1:2、2:1、跳过）。
- * 产品里只用按意思和按顺序（core 的 prefillChapters），按长度、合并只在这里做对照
+ * 产品里用按意思、按长度、按顺序（core 的 prefillChapters），合并只在这里做对照
  */
-
-function sectionChars(s: Section): number {
-  return s.blocks.reduce((n, b) => n + b.text.replace(/\s/g, '').length, 0);
-}
 
 export interface ChapterOptions {
   threshold: number;
@@ -47,7 +45,7 @@ export function predictAll(
     toGroups(align(enIds.length, zhIds.length, cost), enIds, zhIds, en, zh);
   return {
     order: prefillSectionsByOrder(en, zh),
-    length: run(length),
+    length: pairByLength(en, zh),
     meaning: run(meaning),
     combined: run(combinedCost(length, meaning, options.lambda)),
   };
