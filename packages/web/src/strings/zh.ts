@@ -36,6 +36,14 @@ export const zh: Strings = {
 
   start: '开始合并',
   merging: '合并中…',
+  progress: {
+    reading: '正在读取…',
+    chapters: '正在配对章节…',
+    paragraphs: (done, total) => `正在配对段落 ${done}/${total}…`,
+    generating: '正在生成…',
+  },
+  cancel: '取消',
+  cancelled: '已取消',
   sameBookReminder: '请确认两本是同一本书的两个语言版本',
   needBothBooks: '先放入两本书',
   mergeIssue: {

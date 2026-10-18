@@ -23,19 +23,27 @@ export interface BookAlignment {
   groups: GroupAlignment[];
 }
 
+export interface BookOptions extends ParagraphOptions {
+  /** 每处理完一组调用一次（跳过的组也算），最后一次是 (total, total) */
+  onProgress?: (done: number, total: number) => void;
+}
+
 export async function alignBook(
   groups: ChapterGroup[],
   en: Section[],
   zh: Section[],
-  options: ParagraphOptions = {},
+  options: BookOptions = {},
 ): Promise<BookAlignment> {
+  const { onProgress, ...paragraphOptions } = options;
   const out: GroupAlignment[] = [];
   for (const [index, g] of groups.entries()) {
     const enBlocks = g.en.flatMap((i) => en[i]!.blocks);
     const zhBlocks = g.zh.flatMap((i) => zh[i]!.blocks);
-    if (enBlocks.length === 0 || zhBlocks.length === 0) continue;
-    const { pairs } = await alignParagraphs(enBlocks, zhBlocks, options);
-    out.push({ index, en: enBlocks, zh: zhBlocks, pairs });
+    if (enBlocks.length > 0 && zhBlocks.length > 0) {
+      const { pairs } = await alignParagraphs(enBlocks, zhBlocks, paragraphOptions);
+      out.push({ index, en: enBlocks, zh: zhBlocks, pairs });
+    }
+    onProgress?.(index + 1, groups.length);
   }
   return { method: options.embedder === undefined ? 'length' : 'combined', groups: out };
 }

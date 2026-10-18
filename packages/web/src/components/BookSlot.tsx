@@ -1,14 +1,17 @@
 import { IconBook, IconLoader2, IconPlus, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import type { LoadedBook } from '../pipeline.ts';
+import type { BookSummary } from '../pipeline.ts';
 import { languageName, useLocale } from '../strings/index.tsx';
 
-/** 一个上传框的状态。id 用来认出"读完的是哪次上传"，读的时候交换或移除也不会放错位置 */
+/**
+ * 一个上传框的状态。id 用来认出"读完的是哪次上传"，读的时候交换或移除也不会放错位置。
+ * bytes 留在主线程：Worker 不保存书，合并时再传过去
+ */
 export type SlotState =
   | { status: 'empty' }
   | { status: 'loading'; id: number; fileName: string }
-  | { status: 'ready'; id: number; fileName: string; book: LoadedBook }
+  | { status: 'ready'; id: number; fileName: string; bytes: Uint8Array; summary: BookSummary }
   | { status: 'error'; id: number; fileName: string; code: string };
 
 interface Props {
@@ -120,16 +123,16 @@ export function BookSlot({ position, state, onFile, onRemove }: Props) {
             <IconBook size={22} />
           </div>
           <p className="mt-2 line-clamp-2 text-[15px] font-medium text-gray-900">
-            {state.book.title}
+            {state.summary.title}
           </p>
           <p className="max-w-full truncate text-[13px] text-gray-500">
-            {state.book.authors.join(', ')}
+            {state.summary.authors.join(', ')}
           </p>
           <span
             className={`mt-1.5 rounded-md px-2.5 py-0.5 text-xs ${first ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}
           >
-            {state.book.language.kind === 'single'
-              ? languageName(t, state.book.language.lang)
+            {state.summary.language.kind === 'single'
+              ? languageName(t, state.summary.language.lang)
               : t.languageUnclear}
           </span>
         </>

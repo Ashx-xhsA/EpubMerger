@@ -10,22 +10,29 @@ import { BookSlot } from './components/BookSlot.tsx';
 import type { SlotState } from './components/BookSlot.tsx';
 import { LanguageSwitch } from './components/LanguageSwitch.tsx';
 import { LayoutPicker } from './components/LayoutPicker.tsx';
-import { loadBook, mergeBooks } from './pipeline.ts';
-import type { Layout, MergeStats } from './pipeline.ts';
+import type { Layout, MergeProgress, MergeStats } from './pipeline.ts';
 import { languageName, useLocale } from './strings/index.tsx';
 import type { Strings } from './strings/en.ts';
+import { call, callback, cancel, CANCELLED } from './worker-client.ts';
 
 type MergeState =
   | { status: 'idle' }
-  | { status: 'running' }
+  /** progress 是 null 时还没收到 Worker 的第一条进度 */
+  | { status: 'running'; progress: MergeProgress | null }
+  /** 用户点了"取消"；交换、换书这类操作顺带取消的不算，直接回到 idle */
+  | { status: 'cancelled' }
   | { status: 'done'; url: string; fileName: string; stats: MergeStats }
   /** 错误提示是按当前界面语言生成文字的函数，切换语言后跟着变 */
   | { status: 'error'; message: (t: Strings) => string };
 
 let nextId = 0;
 
-/** 让浏览器先把"读取中 / 合并中"画出来，再开始卡住主线程的计算（1.2 改用 Worker 后不需要） */
-const paint = () => new Promise((resolve) => setTimeout(resolve, 30));
+const progressText = (t: Strings, p: MergeProgress | null) =>
+  p === null
+    ? t.merging
+    : p.stage === 'paragraphs'
+      ? t.progress.paragraphs(p.done, p.total)
+      : t.progress[p.stage];
 
 export function App() {
   const { t } = useLocale();
@@ -36,9 +43,10 @@ export function App() {
   const [layout, setLayout] = useState<Layout>('stacked');
   const [merge, setMerge] = useState<MergeState>({ status: 'idle' });
 
-  /** 书、顺序、排版一变，之前的合并结果就作废 */
+  /** 书、顺序、排版一变，之前的合并结果就作废；还在合并就取消 */
   const resetMerge = () => {
     if (merge.status === 'done') URL.revokeObjectURL(merge.url);
+    if (merge.status === 'running') cancel();
     setMerge({ status: 'idle' });
   };
 
@@ -57,13 +65,15 @@ export function App() {
       return copy;
     });
     const bytes = new Uint8Array(await file.arrayBuffer());
-    await paint();
-    const result = loadBook(bytes, file.name);
+    // 复制一份给 Worker，自己留着 bytes，合并时还要用
+    const result = await call((api) => api.loadBook(bytes, file.name));
     updateSlot(
       id,
-      result.ok
-        ? { status: 'ready', id, fileName: file.name, book: result.book }
-        : { status: 'error', id, fileName: file.name, code: result.code },
+      result === CANCELLED
+        ? { status: 'empty' }
+        : result.ok
+          ? { status: 'ready', id, fileName: file.name, bytes, summary: result.summary }
+          : { status: 'error', id, fileName: file.name, code: result.code },
     );
   };
 
@@ -92,14 +102,19 @@ export function App() {
   const onMerge = async () => {
     if (first.status !== 'ready' || second.status !== 'ready') return;
     resetMerge();
-    setMerge({ status: 'running' });
-    await paint();
-    const result = await mergeBooks(first.book, second.book, { layout });
+    setMerge({ status: 'running', progress: null });
+    const onProgress = (progress: MergeProgress) =>
+      setMerge((m) => (m.status === 'running' ? { status: 'running', progress } : m));
+    const result = await call((api) =>
+      api.mergeBooks(first, second, { layout }, callback(onProgress)),
+    );
+    // 被取消时，触发取消的那个操作已经改好了状态
+    if (result === CANCELLED) return;
     if (result.ok) {
       const url = URL.createObjectURL(
         new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: 'application/epub+zip' }),
       );
-      const fileName = `${first.book.title.replace(/[\\/:*?"<>|]/g, '_')} (bilingual).epub`;
+      const fileName = `${first.summary.title.replace(/[\\/:*?"<>|]/g, '_')} (bilingual).epub`;
       setMerge({ status: 'done', url, fileName, stats: result.stats });
     } else if ('issues' in result) {
       const issue = result.issues.find((i) => i.level === 'error') ?? result.issues[0]!;
@@ -115,8 +130,8 @@ export function App() {
 
   /** 示意图说明里用的名字：识别出的语言，没上传或认不出时用"第 n 本" */
   const nameOf = (slot: SlotState, n: number) =>
-    slot.status === 'ready' && slot.book.language.kind === 'single'
-      ? languageName(t, slot.book.language.lang)
+    slot.status === 'ready' && slot.summary.language.kind === 'single'
+      ? languageName(t, slot.summary.language.lang)
       : t.bookFallback(n);
 
   return (
@@ -171,14 +186,28 @@ export function App() {
         </div>
 
         <div className="mt-7 text-center">
-          <button
-            type="button"
-            disabled={!bothReady || merge.status === 'running'}
-            onClick={() => void onMerge()}
-            className="h-11 rounded-lg bg-blue-600 px-10 text-base font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-          >
-            {merge.status === 'running' ? t.merging : t.start}
-          </button>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              disabled={!bothReady || merge.status === 'running'}
+              onClick={() => void onMerge()}
+              className="h-11 rounded-lg bg-blue-600 px-10 text-base font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+            >
+              {merge.status === 'running' ? progressText(t, merge.progress) : t.start}
+            </button>
+            {merge.status === 'running' && (
+              <button
+                type="button"
+                onClick={() => {
+                  cancel();
+                  setMerge({ status: 'cancelled' });
+                }}
+                className="h-11 rounded-lg border border-gray-300 px-4 text-[15px] text-gray-700 hover:bg-gray-50"
+              >
+                {t.cancel}
+              </button>
+            )}
+          </div>
           <p className="mt-2 text-xs text-gray-400">
             {bothReady ? t.sameBookReminder : t.needBothBooks}
           </p>
@@ -197,6 +226,9 @@ export function App() {
                 {t.done(merge.stats.pairs, (merge.stats.ms / 1000).toFixed(1))}
               </p>
             </div>
+          )}
+          {merge.status === 'cancelled' && (
+            <p className="mt-4 text-sm text-gray-500">{t.cancelled}</p>
           )}
           {merge.status === 'error' && (
             <p className="mt-4 text-sm text-red-600">{merge.message(t)}</p>

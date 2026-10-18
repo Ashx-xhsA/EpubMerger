@@ -42,6 +42,23 @@ describe('alignBook', () => {
       { en: [1], zh: [1] },
     ]);
   });
+
+  it('reports progress after every group, skipped ones included', async () => {
+    const calls: [number, number][] = [];
+    await alignBook(
+      [
+        { en: [0], zh: [] },
+        { en: [1], zh: [0] },
+      ],
+      en,
+      zh,
+      { onProgress: (done, total) => calls.push([done, total]) },
+    );
+    expect(calls).toEqual([
+      [1, 2],
+      [2, 2],
+    ]);
+  });
 });
 
 describe('toBlockPairs', () => {

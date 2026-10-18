@@ -55,7 +55,12 @@ export type {
   ParagraphOptions,
 } from './paragraphs/align-paragraphs.ts';
 export { alignBook, toBlockPairs } from './paragraphs/align-book.ts';
-export type { BlockPair, BookAlignment, GroupAlignment } from './paragraphs/align-book.ts';
+export type {
+  BlockPair,
+  BookAlignment,
+  BookOptions,
+  GroupAlignment,
+} from './paragraphs/align-book.ts';
 export { BILINGUAL_CSS, generateBilingual } from './generate/generate.ts';
 export type {
   GenerateInput,

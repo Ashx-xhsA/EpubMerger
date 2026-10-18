@@ -36,6 +36,14 @@ export const en = {
 
   start: 'Start merging',
   merging: 'Merging…',
+  progress: {
+    reading: 'Reading the books…',
+    chapters: 'Matching chapters…',
+    paragraphs: (done: number, total: number) => `Matching paragraphs ${done}/${total}…`,
+    generating: 'Building the ePub…',
+  },
+  cancel: 'Cancel',
+  cancelled: 'Cancelled',
   sameBookReminder: 'Make sure both files are the same book in two languages',
   needBothBooks: 'Add both books first',
   mergeIssue: {

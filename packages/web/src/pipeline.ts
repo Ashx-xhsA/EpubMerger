@@ -1,5 +1,6 @@
-// 调用 core 的整条流程。不依赖 React，1.2 原样搬进 Web Worker。
+// 调用 core 的整条流程，只在 Web Worker 里跑（worker.ts）。不依赖 React。
 // 顺序照抄 cli 的 merge：解析 → 抽块 → 切章 → 识别语言 → 章节按顺序预填 → 只按长度配段落 → 生成
+// Worker 不保存书：主线程留着文件字节，合并时再传一次、重新解析（取消 = 杀掉 Worker，见 worker-client.ts）
 
 import {
   alignBook,
@@ -15,18 +16,22 @@ import {
 } from '@epubmerger/core';
 import type { Book, BookLanguage, LanguageIssue, ParseErrorCode, Section } from '@epubmerger/core';
 
-export interface LoadedBook {
-  book: Book;
-  sections: Section[];
-  language: BookLanguage;
+/** 传回主线程的书的信息，只有界面要显示的几项 */
+export interface BookSummary {
   title: string;
   authors: string[];
+  language: BookLanguage;
 }
 
-export type LoadResult = { ok: true; book: LoadedBook } | { ok: false; code: ParseErrorCode };
+interface LoadedBook extends BookSummary {
+  book: Book;
+  sections: Section[];
+}
+
+type ReadResult = { ok: true; book: LoadedBook } | { ok: false; code: ParseErrorCode };
 
 /** 读一本书：解析、抽块、切章、识别语言 */
-export function loadBook(bytes: Uint8Array, fileName: string): LoadResult {
+function readBook(bytes: Uint8Array, fileName: string): ReadResult {
   const parsed = parseEpub(bytes);
   if (!parsed.ok) return { ok: false, code: parsed.error.code };
   const { book } = parsed;
@@ -43,6 +48,21 @@ export function loadBook(bytes: Uint8Array, fileName: string): LoadResult {
   };
 }
 
+export type LoadResult = { ok: true; summary: BookSummary } | { ok: false; code: ParseErrorCode };
+
+/** 上传时调用：读一遍，只把摘要传回去 */
+export function loadBook(bytes: Uint8Array, fileName: string): LoadResult {
+  const read = readBook(bytes, fileName);
+  if (!read.ok) return read;
+  const { title, authors, language } = read.book;
+  return { ok: true, summary: { title, authors, language } };
+}
+
+export interface BookInput {
+  bytes: Uint8Array;
+  fileName: string;
+}
+
 export type Layout = 'stacked' | 'columns';
 
 export interface MergeStats {
@@ -52,6 +72,10 @@ export interface MergeStats {
   inserted: number;
   ms: number;
 }
+
+export type MergeProgress =
+  | { stage: 'reading' | 'chapters' | 'generating' }
+  | { stage: 'paragraphs'; done: number; total: number };
 
 export type MergeResult =
   | { ok: true; bytes: Uint8Array; stats: MergeStats }
@@ -65,11 +89,19 @@ const isChinese = (l: BookLanguage) => l.kind === 'single' && l.lang.startsWith(
  * 哪本是英文、哪本是中文按识别出的语言定，和左右位置无关；都认不出时按位置，first 当英文
  */
 export async function mergeBooks(
-  first: LoadedBook,
-  second: LoadedBook,
+  firstInput: BookInput,
+  secondInput: BookInput,
   options: { layout: Layout },
+  onProgress: (progress: MergeProgress) => void = () => {},
 ): Promise<MergeResult> {
   const start = performance.now();
+  onProgress({ stage: 'reading' });
+  // 上传时已经读成功过，这里一般不会失败
+  const firstRead = readBook(firstInput.bytes, firstInput.fileName);
+  const secondRead = readBook(secondInput.bytes, secondInput.fileName);
+  if (!firstRead.ok) return { ok: false, message: firstRead.code };
+  if (!secondRead.ok) return { ok: false, message: secondRead.code };
+  const [first, second] = [firstRead.book, secondRead.book];
   const check = checkLanguagePair(first.language, second.language);
   if (!check.ok) return { ok: false, issues: check.issues };
 
@@ -78,8 +110,12 @@ export async function mergeBooks(
   const [en, zh] = firstIsZh ? [second, first] : [first, second];
   const langOf = (l: BookLanguage, fallback: string) => (l.kind === 'single' ? l.lang : fallback);
 
+  onProgress({ stage: 'chapters' });
   const { groups } = await prefillChapters(en.sections, zh.sections);
-  const aligned = await alignBook(groups, en.sections, zh.sections);
+  const aligned = await alignBook(groups, en.sections, zh.sections, {
+    onProgress: (done, total) => onProgress({ stage: 'paragraphs', done, total }),
+  });
+  onProgress({ stage: 'generating' });
   const skeleton = firstIsZh ? 'zh' : 'en';
   const pairs = toBlockPairs(aligned, skeleton);
   const result = generateBilingual({
