@@ -71,10 +71,12 @@ export type {
 export { findCover } from './epub/cover.ts';
 export type { Cover } from './epub/cover.ts';
 export { parseEpub } from './epub/parse.ts';
+export { MAX_FILE_BYTES } from './epub/zip.ts';
 export { extractBlocks } from './extract/extract.ts';
 export type { Block, BlockKind, ExtractResult, FileInfo, Region } from './extract/types.ts';
 export { detectLanguage } from './lang/detect.ts';
-export { checkLanguagePair, SUPPORTED_LANGUAGES } from './lang/pair.ts';
+export { checkLanguagePair, RTL_LANGUAGES, TESTED_LANGUAGES } from './lang/pair.ts';
+export type { LanguageLists } from './lang/pair.ts';
 export type {
   BookLanguage,
   LanguageDetection,

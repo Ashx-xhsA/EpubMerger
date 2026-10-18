@@ -25,14 +25,27 @@ describe('checkLanguagePair', () => {
     }
   });
 
-  it('rejects unsupported languages and says which book and language', () => {
+  it('only warns about languages we have not tested, and says which book and language', () => {
     expect(checkLanguagePair(lang('en'), lang('zh-Hant'))).toEqual({
-      ok: false,
-      issues: [{ level: 'error', code: 'UNSUPPORTED_LANGUAGE', bookSide: 'b', lang: 'zh-Hant' }],
+      ok: true,
+      issues: [{ level: 'warning', code: 'UNTESTED_LANGUAGE', bookSide: 'b', lang: 'zh-Hant' }],
     });
-    expect(checkLanguagePair(lang('fr'), lang('ja')).issues).toEqual([
-      { level: 'error', code: 'UNSUPPORTED_LANGUAGE', bookSide: 'a', lang: 'fr' },
-      { level: 'error', code: 'UNSUPPORTED_LANGUAGE', bookSide: 'b', lang: 'ja' },
+    expect(checkLanguagePair(lang('fr'), lang('ja'))).toEqual({
+      ok: true,
+      issues: [
+        { level: 'warning', code: 'UNTESTED_LANGUAGE', bookSide: 'a', lang: 'fr' },
+        { level: 'warning', code: 'UNTESTED_LANGUAGE', bookSide: 'b', lang: 'ja' },
+      ],
+    });
+  });
+
+  it('rejects right-to-left scripts', () => {
+    expect(checkLanguagePair(lang('ar'), lang('en'))).toEqual({
+      ok: false,
+      issues: [{ level: 'error', code: 'UNSUPPORTED_LANGUAGE', bookSide: 'a', lang: 'ar' }],
+    });
+    expect(checkLanguagePair(lang('zh-Hans'), lang('he')).issues).toEqual([
+      { level: 'error', code: 'UNSUPPORTED_LANGUAGE', bookSide: 'b', lang: 'he' },
     ]);
   });
 
@@ -43,8 +56,9 @@ describe('checkLanguagePair', () => {
     });
   });
 
-  it('opens another language pair by changing only the supported list', () => {
-    expect(checkLanguagePair(lang('ja'), lang('en'), ['en', 'ja'])).toEqual({
+  it('marks another language as tested by changing only the lists', () => {
+    const lists = { tested: ['en', 'ja'], unsupported: [] };
+    expect(checkLanguagePair(lang('ja'), lang('en'), lists)).toEqual({
       ok: true,
       issues: [],
     });

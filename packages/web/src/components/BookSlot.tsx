@@ -1,7 +1,8 @@
-import { IconBook, IconLoader2, IconPlus, IconX } from '@tabler/icons-react';
+import { IconAlertCircle, IconBook, IconLoader2, IconPlus, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import type { BookSummary } from '../pipeline.ts';
+import type { BookSummary, Layout } from '../pipeline.ts';
+import type { LoadErrorCode } from '../strings/en.ts';
 import { languageName, useLocale } from '../strings/index.tsx';
 
 /**
@@ -20,18 +21,29 @@ export type SlotState =
       /** 封面的临时网址（blob:），由 App 生成和释放；没有封面时是 null */
       coverUrl: string | null;
     }
-  | { status: 'error'; id: number; fileName: string; code: string };
+  | { status: 'error'; id: number; fileName: string; code: LoadErrorCode };
+
+/** 语言组合检查挂在这本书上的问题，App 算好、已经按界面语言写成文字 */
+export interface SlotIssue {
+  level: 'error' | 'warning';
+  /** 显示在语言标签里，例如"简体中文 · 两本相同" */
+  label: string;
+}
 
 interface Props {
   /** 1 = 排在前面（蓝色），2 = 排在后面（灰色） */
   position: 1 | 2;
   state: SlotState;
+  /** 排版：左右两栏时标签写"排在左边 / 右边"，上下交替时写"排在前面 / 后面" */
+  layout: Layout;
+  /** 没有问题时是 null，这时标签显示识别出的语言 */
+  issue: SlotIssue | null;
   /** 拖进来或选中的所有文件。一次给两本时，App 把它们分到两个框 */
   onFiles: (files: File[]) => void;
   onRemove: () => void;
 }
 
-export function BookSlot({ position, state, onFiles, onRemove }: Props) {
+export function BookSlot({ position, state, layout, issue, onFiles, onRemove }: Props) {
   const { t } = useLocale();
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -45,13 +57,24 @@ export function BookSlot({ position, state, onFiles, onRemove }: Props) {
   };
 
   const border =
-    state.status === 'ready'
-      ? first
-        ? 'border-blue-600'
-        : 'border-gray-400'
-      : state.status === 'error'
-        ? 'border-red-500'
-        : 'border-dashed border-gray-300 hover:border-gray-500';
+    state.status === 'error' || issue?.level === 'error'
+      ? 'border-red-500'
+      : issue?.level === 'warning'
+        ? 'border-amber-500'
+        : state.status === 'ready'
+          ? first
+            ? 'border-blue-600'
+            : 'border-gray-400'
+          : 'border-dashed border-gray-300 hover:border-gray-500';
+
+  const tag =
+    issue?.level === 'error'
+      ? 'bg-red-50 text-red-700'
+      : issue?.level === 'warning'
+        ? 'bg-amber-50 text-amber-800'
+        : first
+          ? 'bg-blue-50 text-blue-700'
+          : 'bg-gray-100 text-gray-600';
 
   return (
     <div
@@ -85,7 +108,13 @@ export function BookSlot({ position, state, onFiles, onRemove }: Props) {
         >
           {position}
         </span>
-        {first ? t.slotFirst : t.slotSecond}
+        {layout === 'columns'
+          ? first
+            ? t.slotLeft
+            : t.slotRight
+          : first
+            ? t.slotFirst
+            : t.slotSecond}
       </div>
 
       {state.status !== 'empty' && (
@@ -120,8 +149,12 @@ export function BookSlot({ position, state, onFiles, onRemove }: Props) {
 
       {state.status === 'error' && (
         <>
-          <p className="text-sm text-red-600">{t.parseError(state.code)}</p>
-          <p className="mt-1 max-w-full truncate text-xs text-gray-400">{state.fileName}</p>
+          <IconAlertCircle size={32} stroke={1.5} className="text-red-500" />
+          <p className="mt-2 text-[15px] font-medium text-red-700">
+            {t.parseErrors[state.code].title}
+          </p>
+          <p className="mt-1 text-[13px] text-gray-600">{t.parseErrors[state.code].hint}</p>
+          <p className="mt-2 max-w-full truncate text-xs text-gray-400">{state.fileName}</p>
         </>
       )}
 
@@ -134,12 +167,11 @@ export function BookSlot({ position, state, onFiles, onRemove }: Props) {
           <p className="max-w-full truncate text-[13px] text-gray-500">
             {state.summary.authors.join(', ')}
           </p>
-          <span
-            className={`mt-1.5 rounded-md px-2.5 py-0.5 text-xs ${first ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}
-          >
-            {state.summary.language.kind === 'single'
-              ? languageName(t, state.summary.language.lang)
-              : t.languageUnclear}
+          <span className={`mt-1.5 rounded-md px-2.5 py-0.5 text-xs ${tag}`}>
+            {issue?.label ??
+              (state.summary.language.kind === 'single'
+                ? languageName(t, state.summary.language.lang)
+                : t.languageUnclear)}
           </span>
         </>
       )}

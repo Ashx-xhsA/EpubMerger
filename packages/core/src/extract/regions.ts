@@ -49,26 +49,131 @@ const SEMANTIC_TYPES: Record<string, Region> = {
 };
 
 /**
- * 标题关键词。标题先经过 normalizeTitle：转小写、去掉首尾的符号和序号、中文去掉空格。
- * 每条都是整个标题的匹配（^…$）。遇到新写法加在这里
+ * 标题关键词。标题先经过 normalizeTitle：转小写、去掉首尾的符号和序号、汉字标题去掉空格。
+ * 每个词都是整个标题的匹配（^…$），词里可以写正则。遇到新写法加在这里。
+ * 韩文词之间的空格可有可无（'저자 ?소개'）。每种语言一行。序章、Prologue、Epilogue 这类在小说里通常是正文的词不收
  */
-const TITLE_RULES: [Region, RegExp][] = [
-  ['cover', /^(cover( page| image)?|front cover|封面)$/],
-  ['titlepage', /^(title page|half title|书名页|扉页|标题页)$/],
-  ['copyright', /^(copyright( page| information| notice)?|版权(页|信息|声明|所有)?|图书在版编目.*)$/],
-  ['toc', /^(contents|table of contents|目录|目次)$/],
-  ['praise', /^(praise( for .*)?|advance praise( for .*)?|赞誉|各方赞誉|推荐语|媒体推荐|名人推荐|好评推荐)$/],
-  ['also-by', /^(also by .*|by the same author|other books by .*|books by .*|作者其他作品|同作者作品)$/],
-  ['about-author', /^(about the (authors?|translators?)|作者简介|作者介绍|关于作者|译者简介|作者及译者简介|作译者简介)$/],
-  ['translator', /^(译者序|译序|译者前言|译后记|译者后记|译者的话|出版说明|出版者的话|编者按|编者的话|推荐序.*|中文版序.*|中译本序.*|导读.*)$/],
-  ['preface', /^(preface|foreword|introduction|afterword|author'?s note|a note on .*|前言|序言|序|自序|引言|导论|绪论|导言|后记)$/],
-  ['dedication', /^(dedication|献词|题献)$/],
-  ['epigraph', /^(epigraph|题记|引语)$/],
-  ['acknowledgments', /^(acknowledge?ments?|致谢|鸣谢|谢辞)$/],
-  ['notes', /^(notes?|endnotes|footnotes|notes (and|&) sources|sources (and|&) notes|注释|注|尾注|注解)$/],
-  ['bibliography', /^(bibliography|selected bibliography|references|works cited|further reading|sources|illustration credits|picture credits|参考文献|参考书目|延伸阅读|推荐阅读|图片来源)$/],
-  ['index', /^(index|general index|索引)$/],
+const TITLE_WORDS: [Region, string[]][] = [
+  ['cover', [
+    'cover( page| image)?', 'front cover', // en
+    '封面', // zh
+    '表紙', // ja
+    '표지', // ko
+    'couverture', 'umschlag', 'portada', 'cubierta', 'copertina', 'capa', // fr de es it pt
+    'обложка', // ru
+  ]],
+  ['titlepage', [
+    'title page', 'half title',
+    '书名页', '扉页', '标题页', '書名頁', '扉頁',
+    'タイトルページ',
+    '속표지',
+    'page de titre', 'titelseite', 'titelblatt', 'portadilla', 'frontespizio', 'folha de rosto',
+    'титульный лист',
+  ]],
+  ['copyright', [
+    'copyright( page| information| notice)?',
+    '版权(页|信息|声明|所有)?', '图书在版编目.*', '版權(頁|資訊|聲明|所有)?',
+    '奥付', '著作権', '版権',
+    '판권(면)?', '저작권',
+    "droits d'auteur", 'mentions légales', 'impressum', 'derechos de autor', "diritti d'autore", 'direitos autorais', 'ficha técnica',
+    'авторские права', 'выходные данные',
+  ]],
+  ['toc', [
+    'contents', 'table of contents',
+    '目录', '目次', '目錄',
+    'もくじ',
+    '차례', '목차',
+    'table des matières', 'sommaire', 'inhalt', 'inhaltsverzeichnis', 'índice', 'contenidos?', 'indice', 'sommario', 'sumário', 'conteúdo',
+    'содержание', 'оглавление',
+  ]],
+  ['praise', [
+    'praise( for .*)?', 'advance praise( for .*)?',
+    '赞誉', '各方赞誉', '推荐语', '媒体推荐', '名人推荐', '好评推荐', '讚譽', '各方讚譽', '推薦語', '媒體推薦', '名人推薦', '好評推薦',
+    'pressestimmen', 'elogios',
+  ]],
+  ['also-by', [
+    'also by .*', 'by the same author', 'other books by .*', 'books by .*',
+    '作者其他作品', '同作者作品',
+    'du même auteur', 'vom selben autor', 'weitere bücher von .*', 'del mismo autor', 'otras obras de .*', 'dello stesso autore', 'altre opere di .*', 'do mesmo autor', 'outras obras de .*',
+  ]],
+  ['about-author', [
+    'about the (authors?|translators?)',
+    '作者简介', '作者介绍', '关于作者', '译者简介', '作者及译者简介', '作译者简介', '作者簡介', '作者介紹', '關於作者', '譯者簡介',
+    '著者紹介', '著者略歴', '作者紹介', '訳者紹介', '訳者略歴',
+    '(저자|지은이|옮긴이|역자) ?소개',
+    "à propos de l'auteur", "l'auteur", 'über den autor', 'über die autorin', 'zum autor', 'zur autorin', 'sobre el autor', 'sobre la autora', 'acerca del autor', "l'autore", "nota sull'autore", 'sobre o autor', 'sobre a autora',
+    'об авторе',
+  ]],
+  ['translator', [
+    '译者序', '译序', '译者前言', '译后记', '译者后记', '译者的话', '出版说明', '出版者的话', '编者按', '编者的话', '推荐序.*', '中文版序.*', '中译本序.*', '导读.*',
+    '譯者序', '譯序', '譯者前言', '譯後記', '譯者後記', '譯者的話', '出版說明', '編者按', '編者的話', '推薦序.*', '中譯本序.*', '導讀.*',
+    '訳者あとがき', '訳者解説', '解説',
+    '옮긴이의 ?말', '역자 ?후기', '역자의 ?말', '해설',
+    'note du traducteur', 'préface du traducteur', 'nachwort des übersetzers', 'anmerkung des übersetzers', 'nota del traductor', 'nota del traduttore', 'nota do tradutor',
+    'от переводчика',
+  ]],
+  ['preface', [
+    'preface', 'foreword', 'introduction', 'afterword', "author'?s note", 'a note on .*',
+    '前言', '序言', '序', '自序', '引言', '导论', '绪论', '导言', '后记', '導論', '緒論', '導言', '後記',
+    'まえがき', 'はじめに', '序文', 'あとがき',
+    '서문', '머리말', '들어가며', '서론', '후기',
+    'préface', 'avant-propos', 'postface', 'vorwort', 'einleitung', 'einführung', 'nachwort', 'prefacio', 'introducción', 'nota del autor', 'prefazione', 'introduzione', 'premessa', 'postfazione', "nota dell'autore", 'prefácio', 'introdução', 'apresentação', 'posfácio', 'nota do autor',
+    'предисловие', 'введение', 'послесловие', 'от автора',
+  ]],
+  ['dedication', [
+    'dedication',
+    '献词', '题献', '獻詞', '題獻',
+    '献辞',
+    '헌사',
+    'dédicace', 'widmung', 'dedicatoria', 'dedica', 'dedicatória',
+    'посвящение',
+  ]],
+  ['epigraph', [
+    'epigraph',
+    '题记', '引语', '題記', '引語',
+    '題辞', 'エピグラフ',
+    'épigraphe', 'exergue', 'motto', 'epígrafe', 'epigrafe',
+    'эпиграф',
+  ]],
+  ['acknowledgments', [
+    'acknowledge?ments?',
+    '致谢', '鸣谢', '谢辞', '致謝', '鳴謝', '謝辭',
+    '謝辞',
+    '감사의 ?(말|글)',
+    'remerciements', 'danksagung', 'dank', 'agradecimientos', 'ringraziamenti', 'agradecimentos',
+    'благодарности',
+  ]],
+  ['notes', [
+    'notes?', 'endnotes', 'footnotes', 'notes (and|&) sources', 'sources (and|&) notes',
+    '注释', '注', '尾注', '注解', '註釋', '注釋', '註', '尾註', '註解',
+    '原注', '訳注', '脚注',
+    '주', '주석', '미주',
+    'anmerkungen', 'fußnoten', 'endnoten', 'notas', 'note',
+    'примечания', 'комментарии',
+  ]],
+  ['bibliography', [
+    'bibliography', 'selected bibliography', 'references', 'works cited', 'further reading', 'sources', 'illustration credits', 'picture credits',
+    '参考文献', '参考书目', '延伸阅读', '推荐阅读', '图片来源', '參考文獻', '參考書目', '延伸閱讀', '推薦閱讀', '圖片來源',
+    '引用文献', '文献',
+    '참고 ?문헌',
+    'bibliographie', 'références', 'literaturverzeichnis', 'bibliografie', 'quellen', 'literatur', 'bibliografía', 'referencias', 'fuentes', 'bibliografia', 'riferimenti bibliografici', 'fonti', 'referências', 'fontes',
+    'библиография', 'литература', 'список литературы', 'источники',
+  ]],
+  ['index', [
+    'index', 'general index',
+    '索引',
+    '찾아보기', '색인',
+    'index des noms', 'register', 'personenregister', 'sachregister', 'namensregister', 'índice (alfabético|analítico|onomástico)', 'indice (analitico|dei nomi)', 'índice (remissivo|onomástico)',
+    '(предметный |именной )?указатель',
+  ]],
 ]; // prettier-ignore
+
+// PURE：告诉打包工具这个调用没有副作用。主页面只从 core 拿 checkLanguagePair，
+// 没有这个标记，这张词表会被一起打包进主页面
+const TITLE_RULES: [Region, RegExp][] = /* @__PURE__ */ TITLE_WORDS.map(([region, words]) => [
+  region,
+  new RegExp(`^(${words.join('|')})$`),
+]);
 
 const CJK = /\p{Script=Han}/u;
 
@@ -102,10 +207,14 @@ function regionOfTypes(types: string[]): string | null {
 const COPYRIGHT_SIGNS: [string, RegExp][] = [
   ['ISBN', /ISBN/i],
   ['©', /©|\(c\)\s*\d{4}|copyright\s+(©\s*)?\d{4}/i],
-  ['all rights reserved', /all rights reserved/i],
-  ['版权所有', /版权所有/],
-  ['CIP', /CIP|在版编目/],
-  ['定价', /定\s*价/],
+  [
+    'all rights reserved',
+    /all rights reserved|tous droits réservés|alle rechte vorbehalten|todos los derechos reservados|tutti i diritti riservati|todos os direitos reservados|все права защищены/i,
+  ],
+  ['版权所有', /版权所有|版權所有|無断(転載|複製|複写)|무단 ?(전재|복제)/],
+  ['CIP', /CIP|在版编目|在版編目/],
+  ['定价', /定\s*[价價]/],
+  ['dépôt légal', /dépôt légal|depósito legal/i],
 ];
 const COPYRIGHT_MAX_CHARS = 5000;
 

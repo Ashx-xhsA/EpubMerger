@@ -53,6 +53,8 @@ const BCP47: Readonly<Record<string, string>> = {
   ell: 'el',
   arb: 'ar',
   heb: 'he',
+  pes: 'fa',
+  urd: 'ur',
   hin: 'hi',
   tha: 'th',
 };

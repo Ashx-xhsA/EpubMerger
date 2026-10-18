@@ -5,9 +5,12 @@ import {
   IconDownload,
   IconLock,
 } from '@tabler/icons-react';
+import { checkLanguagePair, MAX_FILE_BYTES } from '@epubmerger/core';
+import type { LanguageIssue } from '@epubmerger/core';
 import { useEffect, useRef, useState } from 'react';
 import { BookSlot } from './components/BookSlot.tsx';
-import type { SlotState } from './components/BookSlot.tsx';
+import type { SlotIssue, SlotState } from './components/BookSlot.tsx';
+import { IssueNotice } from './components/IssueNotice.tsx';
 import { LanguageSwitch } from './components/LanguageSwitch.tsx';
 import { LayoutPicker } from './components/LayoutPicker.tsx';
 import type { Layout, MergeProgress, MergeStats } from './pipeline.ts';
@@ -30,6 +33,14 @@ let nextId = 0;
 const coverUrls = (slots: SlotState[]) =>
   slots.flatMap((s) => (s.status === 'ready' && s.coverUrl !== null ? [s.coverUrl] : []));
 
+type ReadySlot = Extract<SlotState, { status: 'ready' }>;
+
+/** 语言问题的完整说明。书名用问题挂着的那本；两本一起的问题（SAME_LANGUAGE）不用书名 */
+const issueDetail = (t: Strings, issue: LanguageIssue, books: [ReadySlot, ReadySlot]) => {
+  const book = issue.bookSide === 'b' ? books[1] : books[0];
+  return t.languageIssues[issue.code].detail(languageName(t, issue.lang ?? ''), book.summary.title);
+};
+
 const progressText = (t: Strings, p: MergeProgress | null) =>
   p === null
     ? t.merging
@@ -45,6 +56,8 @@ export function App() {
   ]);
   const [layout, setLayout] = useState<Layout>('stacked');
   const [merge, setMerge] = useState<MergeState>({ status: 'idle' });
+  /** 点过"仍然继续"的那两本书（两个 id 排好序），换了书就不算数；交换不影响 */
+  const [continuedFor, setContinuedFor] = useState<string | null>(null);
 
   // 封面网址：上一次画到页面上的两个框里有、这一次没有的（移除、换书），释放掉。
   // 交换只是换位置，网址还在，不会被释放
@@ -101,9 +114,19 @@ export function App() {
       copy[index] = { status: 'loading', id, fileName: file.name };
       return copy;
     });
+    // 太大的文件不读进内存：读进来再复制给 Worker 会很慢，甚至让页面崩掉。上限和 core 用同一个
+    if (file.size > MAX_FILE_BYTES)
+      return updateSlot(id, { status: 'error', id, fileName: file.name, code: 'TOO_LARGE' });
     const bytes = new Uint8Array(await file.arrayBuffer());
-    // 复制一份给 Worker，自己留着 bytes，合并时还要用
-    const result = await call((api) => api.loadBook(bytes, file.name));
+    let result;
+    try {
+      // 复制一份给 Worker，自己留着 bytes，合并时还要用
+      result = await call((api) => api.loadBook(bytes, file.name));
+    } catch (error) {
+      // core 没有返回错误码、而是直接抛错（多半是 core 的 bug）。不然这个框会一直转圈
+      console.error(error);
+      return updateSlot(id, { status: 'error', id, fileName: file.name, code: 'UNEXPECTED' });
+    }
     if (result === CANCELLED) return updateSlot(id, { status: 'empty' });
     if (!result.ok)
       return updateSlot(id, { status: 'error', id, fileName: file.name, code: result.code });
@@ -147,6 +170,26 @@ export function App() {
 
   const [first, second] = slots;
   const bothReady = first.status === 'ready' && second.status === 'ready';
+  const bothEmpty = first.status === 'empty' && second.status === 'empty';
+
+  // 两本都读完就检查语言组合。每次渲染时现算（不到 1 毫秒），交换、换书后自动更新
+  const issues = bothReady
+    ? checkLanguagePair(first.summary.language, second.summary.language).issues
+    : [];
+  const errors = issues.filter((i) => i.level === 'error');
+  const warnings = issues.filter((i) => i.level === 'warning');
+  const pairKey = bothReady ? [first.id, second.id].sort((x, y) => x - y).join('-') : null;
+  const needsContinue = warnings.length > 0 && errors.length === 0 && continuedFor !== pairKey;
+
+  /** 这张卡片上的问题：挂在这本或两本上的，error 优先 */
+  const slotIssue = (side: 'a' | 'b'): SlotIssue | null => {
+    const issue = [...errors, ...warnings].find(
+      (i) => i.bookSide === side || i.bookSide === 'both',
+    );
+    if (issue === undefined) return null;
+    const label = t.languageIssues[issue.code].label(languageName(t, issue.lang ?? ''));
+    return { level: issue.level, label };
+  };
 
   const onMerge = async () => {
     if (first.status !== 'ready' || second.status !== 'ready') return;
@@ -171,11 +214,10 @@ export function App() {
       const fileName = `${first.summary.title.replace(/[\\/:*?"<>|]/g, '_')} (bilingual).epub`;
       setMerge({ status: 'done', url, fileName, stats: result.stats });
     } else if ('issues' in result) {
+      // 正常情况下到不了这里：有 error 时按钮已经按不了
       const issue = result.issues.find((i) => i.level === 'error') ?? result.issues[0]!;
-      setMerge({
-        status: 'error',
-        message: (t) => t.mergeIssue[issue.code](languageName(t, issue.lang ?? '')),
-      });
+      const books: [ReadySlot, ReadySlot] = [first, second];
+      setMerge({ status: 'error', message: (t) => issueDetail(t, issue, books) });
     } else {
       const { message } = result;
       setMerge({ status: 'error', message: (t) => t.mergeFailed(message) });
@@ -208,6 +250,8 @@ export function App() {
           <BookSlot
             position={1}
             state={first}
+            layout={layout}
+            issue={slotIssue('a')}
             onFiles={(files) => onFiles(0, files)}
             onRemove={() => onRemove(0)}
           />
@@ -225,6 +269,8 @@ export function App() {
           <BookSlot
             position={2}
             state={second}
+            layout={layout}
+            issue={slotIssue('b')}
             onFiles={(files) => onFiles(1, files)}
             onRemove={() => onRemove(1)}
           />
@@ -240,15 +286,42 @@ export function App() {
         </div>
 
         <div className="mt-7 text-center">
+          {bothReady &&
+            (errors.length > 0 ? (
+              <IssueNotice
+                level="error"
+                messages={errors.map((i) => issueDetail(t, i, [first, second]))}
+              />
+            ) : warnings.length > 0 ? (
+              <IssueNotice
+                level="warning"
+                messages={warnings.map((i) => issueDetail(t, i, [first, second]))}
+              />
+            ) : (
+              <IssueNotice level="info" messages={[t.sameBookReminder]} />
+            ))}
           <div className="flex items-center justify-center gap-2">
-            <button
-              type="button"
-              disabled={!bothReady || merge.status === 'running'}
-              onClick={() => void onMerge()}
-              className="h-11 rounded-lg bg-blue-600 px-10 text-base font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-            >
-              {merge.status === 'running' ? progressText(t, merge.progress) : t.start}
-            </button>
+            {needsContinue ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setContinuedFor(pairKey);
+                  void onMerge();
+                }}
+                className="h-11 rounded-lg border-[1.5px] border-amber-500 bg-white px-10 text-base font-medium text-amber-800 hover:bg-amber-50"
+              >
+                {t.continueAnyway}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!bothReady || errors.length > 0 || merge.status === 'running'}
+                onClick={() => void onMerge()}
+                className="h-11 rounded-lg bg-blue-600 px-10 text-base font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+              >
+                {merge.status === 'running' ? progressText(t, merge.progress) : t.start}
+              </button>
+            )}
             {merge.status === 'running' && (
               <button
                 type="button"
@@ -262,9 +335,7 @@ export function App() {
               </button>
             )}
           </div>
-          <p className="mt-2 text-xs text-gray-400">
-            {bothReady ? t.sameBookReminder : t.needBothBooks}
-          </p>
+          {!bothReady && <p className="mt-2 text-xs text-gray-400">{t.needBothBooks}</p>}
 
           {merge.status === 'done' && (
             <div className="mt-5 flex flex-col items-center gap-2">
@@ -289,20 +360,22 @@ export function App() {
           )}
         </div>
 
-        <section className="mt-8 rounded-lg bg-gray-50 px-5 py-4">
-          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
-            <IconBulb size={16} className="text-amber-600" />
-            {t.tipsTitle}
-          </h2>
-          <ul className="grid grid-cols-1 gap-x-5 gap-y-1.5 text-[13px] text-gray-600 sm:grid-cols-2">
-            {t.tips.map((tip) => (
-              <li key={tip} className="flex items-start gap-1.5">
-                <IconCheck size={15} className="mt-0.5 shrink-0 text-green-600" />
-                {tip}
-              </li>
-            ))}
-          </ul>
-        </section>
+        {bothEmpty && (
+          <section className="mt-8 rounded-lg bg-gray-50 px-5 py-4">
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+              <IconBulb size={16} className="text-amber-600" />
+              {t.tipsTitle}
+            </h2>
+            <ul className="grid grid-cols-1 gap-x-5 gap-y-1.5 text-[13px] text-gray-600 sm:grid-cols-2">
+              {t.tips.map((tip) => (
+                <li key={tip} className="flex items-start gap-1.5">
+                  <IconCheck size={15} className="mt-0.5 shrink-0 text-green-600" />
+                  {tip}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <footer className="mt-8 flex justify-center gap-4 border-t border-gray-200 pt-4 text-xs text-gray-400">
           <span>{t.footerPrivacy}</span>

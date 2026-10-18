@@ -45,8 +45,12 @@ export interface LanguageDetection {
   stats: LanguageStats;
 }
 
-/** 两本书语言组合的问题。提示文案由界面按 code 查表，core 里不放 */
-export type LanguageIssueCode = 'LANGUAGE_UNCERTAIN' | 'SAME_LANGUAGE' | 'UNSUPPORTED_LANGUAGE';
+/**
+ * 两本书语言组合的问题。提示文案由界面按 code 查表，core 里不放。
+ * UNSUPPORTED_LANGUAGE 是做不了（从右往左的文字），UNTESTED_LANGUAGE 是能做、但没用测试书验证过
+ */
+export type LanguageIssueCode =
+  'LANGUAGE_UNCERTAIN' | 'SAME_LANGUAGE' | 'UNSUPPORTED_LANGUAGE' | 'UNTESTED_LANGUAGE';
 
 export interface LanguageIssue {
   /** error 要拦下，warning 只提醒 */
@@ -54,7 +58,7 @@ export interface LanguageIssue {
   code: LanguageIssueCode;
   /** 问题挂在哪本书上；SAME_LANGUAGE 是两本一起 */
   bookSide: 'a' | 'b' | 'both';
-  /** 识别出的语言，UNSUPPORTED_LANGUAGE 和 SAME_LANGUAGE 时有，界面用它说"这本书是繁体中文" */
+  /** 识别出的语言，LANGUAGE_UNCERTAIN 以外都有，界面用它说"这本书是繁体中文" */
   lang?: string;
 }
 

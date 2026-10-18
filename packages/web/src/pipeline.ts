@@ -92,11 +92,12 @@ export type MergeResult =
   | { ok: false; issues: LanguageIssue[] }
   | { ok: false; message: string };
 
-const isChinese = (l: BookLanguage) => l.kind === 'single' && l.lang.startsWith('zh');
+/** 认不出语言时 lang 属性填 und（BCP 47 的"未知语言"） */
+const langOf = (l: BookLanguage) => (l.kind === 'single' ? l.lang : 'und');
 
 /**
  * 合并两本书。first 排在前面，也是骨架书（1.7 再把两者分开）。
- * 哪本是英文、哪本是中文按识别出的语言定，和左右位置无关；都认不出时按位置，first 当英文
+ * 语言检查有 error 时不合并；只有警告时照常合并（界面已经让用户点过"仍然继续"）
  */
 export async function mergeBooks(
   firstInput: BookInput,
@@ -115,10 +116,10 @@ export async function mergeBooks(
   const check = checkLanguagePair(first.language, second.language);
   if (!check.ok) return { ok: false, issues: check.issues };
 
-  // 语言检查已经排除了两本同语言、不支持的语言，剩下只有"中文 + 英文"或其中一本认不出
-  const firstIsZh = isChinese(first.language);
-  const [en, zh] = firstIsZh ? [second, first] : [first, second];
-  const langOf = (l: BookLanguage, fallback: string) => (l.kind === 'single' ? l.lang : fallback);
+  // core 的参数叫 en / zh，其实只代表"第一本 / 第二本"：长度比例按两本书自己算，不挑语言。
+  // 这里按位置传，first 进 en 那一侧。长度代价不完全对称，两本对调后个别段落的配法会不同；
+  // 0.9 的 96.5% 是英文在 en 一侧测的，中文排在前面时没测过（2026-10-18 决定仍按位置）
+  const [en, zh] = [first, second];
 
   onProgress({ stage: 'chapters' });
   const { groups } = await prefillChapters(en.sections, zh.sections);
@@ -126,12 +127,11 @@ export async function mergeBooks(
     onProgress: (done, total) => onProgress({ stage: 'paragraphs', done, total }),
   });
   onProgress({ stage: 'generating' });
-  const skeleton = firstIsZh ? 'zh' : 'en';
-  const pairs = toBlockPairs(aligned, skeleton);
+  const pairs = toBlockPairs(aligned, 'en');
   const result = generateBilingual({
     skeleton: first.book,
-    skeletonLang: langOf(first.language, firstIsZh ? 'zh-Hans' : 'en'),
-    otherLang: langOf(second.language, firstIsZh ? 'en' : 'zh-Hans'),
+    skeletonLang: langOf(first.language),
+    otherLang: langOf(second.language),
     pairs,
     otherFirst: false,
     layout: options.layout,
