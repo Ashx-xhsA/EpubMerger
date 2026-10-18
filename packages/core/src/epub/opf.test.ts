@@ -75,6 +75,7 @@ describe('parseOpf: ePub 2', () => {
       creators: ['亨利·吉'],
       languages: ['zh'],
       identifier: '9787521753806', // unique-identifier 指向的那个，不是第一个
+      coverId: null,
     });
     expect(warnings).toEqual([]);
   });

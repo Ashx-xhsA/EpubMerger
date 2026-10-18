@@ -18,7 +18,7 @@ function block(
 function book(files: string[], toc: TocEntry[]): Book {
   return {
     version: '3.0',
-    metadata: { title: '', creators: [], languages: [], identifier: null },
+    metadata: { title: '', creators: [], languages: [], identifier: null, coverId: null },
     opfPath: 'content.opf',
     manifest: new Map(),
     spine: files.map((href) => ({ idref: href, href, linear: true })),

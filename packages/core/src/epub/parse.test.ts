@@ -31,6 +31,7 @@ describe('parseEpub: a valid book', () => {
       creators: ['Test Author'],
       languages: ['en'],
       identifier: 'urn:uuid:12345',
+      coverId: null,
     });
     expect(book.spine.map((s) => s.href)).toEqual(['OEBPS/Text/ch1.xhtml']);
     expect(book.tocSource).toBe('ncx');

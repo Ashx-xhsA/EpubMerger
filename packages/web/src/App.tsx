@@ -5,7 +5,7 @@ import {
   IconDownload,
   IconLock,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BookSlot } from './components/BookSlot.tsx';
 import type { SlotState } from './components/BookSlot.tsx';
 import { LanguageSwitch } from './components/LanguageSwitch.tsx';
@@ -27,6 +27,9 @@ type MergeState =
 
 let nextId = 0;
 
+const coverUrls = (slots: SlotState[]) =>
+  slots.flatMap((s) => (s.status === 'ready' && s.coverUrl !== null ? [s.coverUrl] : []));
+
 const progressText = (t: Strings, p: MergeProgress | null) =>
   p === null
     ? t.merging
@@ -43,6 +46,28 @@ export function App() {
   const [layout, setLayout] = useState<Layout>('stacked');
   const [merge, setMerge] = useState<MergeState>({ status: 'idle' });
 
+  // 封面网址：上一次画到页面上的两个框里有、这一次没有的（移除、换书），释放掉。
+  // 交换只是换位置，网址还在，不会被释放
+  const committed = useRef(slots);
+  useEffect(() => {
+    const keep = new Set(coverUrls(slots));
+    for (const url of coverUrls(committed.current)) {
+      if (!keep.has(url)) URL.revokeObjectURL(url);
+    }
+    committed.current = slots;
+  }, [slots]);
+
+  // 文件拖到框外面放下时，浏览器默认会打开这个文件、离开我们的页面。拦掉，什么都不做
+  useEffect(() => {
+    const ignore = (e: DragEvent) => e.preventDefault();
+    window.addEventListener('dragover', ignore);
+    window.addEventListener('drop', ignore);
+    return () => {
+      window.removeEventListener('dragover', ignore);
+      window.removeEventListener('drop', ignore);
+    };
+  }, []);
+
   /** 书、顺序、排版一变，之前的合并结果就作废；还在合并就取消 */
   const resetMerge = () => {
     if (merge.status === 'done') URL.revokeObjectURL(merge.url);
@@ -56,7 +81,19 @@ export function App() {
       (current) => current.map((s) => ('id' in s && s.id === id ? next : s)) as typeof current,
     );
 
-  const onFile = async (index: 0 | 1, file: File) => {
+  /** 一本：放进这个框。两本或更多：前两本依次放进第 1、第 2 个框，多的不要 */
+  const onFiles = (index: 0 | 1, files: File[]) => {
+    const [a, b] = files;
+    if (a === undefined) return;
+    if (b === undefined) {
+      void loadInto(index, a);
+    } else {
+      void loadInto(0, a);
+      void loadInto(1, b);
+    }
+  };
+
+  const loadInto = async (index: 0 | 1, file: File) => {
     resetMerge();
     const id = nextId++;
     setSlots((current) => {
@@ -67,14 +104,26 @@ export function App() {
     const bytes = new Uint8Array(await file.arrayBuffer());
     // 复制一份给 Worker，自己留着 bytes，合并时还要用
     const result = await call((api) => api.loadBook(bytes, file.name));
-    updateSlot(
+    if (result === CANCELLED) return updateSlot(id, { status: 'empty' });
+    if (!result.ok)
+      return updateSlot(id, { status: 'error', id, fileName: file.name, code: result.code });
+    const { cover } = result.summary;
+    // 读的时候这个框已经被移除或换了书，就不生成网址，免得没人释放
+    const stillThere = committed.current.some((s) => 'id' in s && s.id === id);
+    const coverUrl =
+      cover === null || !stillThere
+        ? null
+        : URL.createObjectURL(
+            new Blob([cover.bytes as Uint8Array<ArrayBuffer>], { type: cover.mediaType }),
+          );
+    updateSlot(id, {
+      status: 'ready',
       id,
-      result === CANCELLED
-        ? { status: 'empty' }
-        : result.ok
-          ? { status: 'ready', id, fileName: file.name, bytes, summary: result.summary }
-          : { status: 'error', id, fileName: file.name, code: result.code },
-    );
+      fileName: file.name,
+      bytes,
+      summary: result.summary,
+      coverUrl,
+    });
   };
 
   const onRemove = (index: 0 | 1) => {
@@ -106,7 +155,12 @@ export function App() {
     const onProgress = (progress: MergeProgress) =>
       setMerge((m) => (m.status === 'running' ? { status: 'running', progress } : m));
     const result = await call((api) =>
-      api.mergeBooks(first, second, { layout }, callback(onProgress)),
+      api.mergeBooks(
+        { bytes: first.bytes, fileName: first.fileName },
+        { bytes: second.bytes, fileName: second.fileName },
+        { layout },
+        callback(onProgress),
+      ),
     );
     // 被取消时，触发取消的那个操作已经改好了状态
     if (result === CANCELLED) return;
@@ -154,7 +208,7 @@ export function App() {
           <BookSlot
             position={1}
             state={first}
-            onFile={(f) => void onFile(0, f)}
+            onFiles={(files) => onFiles(0, files)}
             onRemove={() => onRemove(0)}
           />
           <div className="flex flex-col items-center gap-1">
@@ -171,7 +225,7 @@ export function App() {
           <BookSlot
             position={2}
             state={second}
-            onFile={(f) => void onFile(1, f)}
+            onFiles={(files) => onFiles(1, files)}
             onRemove={() => onRemove(1)}
           />
         </div>

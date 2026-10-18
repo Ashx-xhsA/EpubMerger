@@ -8,6 +8,7 @@ import {
   checkLanguagePair,
   detectLanguage,
   extractBlocks,
+  findCover,
   generateBilingual,
   parseEpub,
   prefillChapters,
@@ -21,9 +22,11 @@ export interface BookSummary {
   title: string;
   authors: string[];
   language: BookLanguage;
+  /** 封面图片的字节，没有封面时是 null */
+  cover: { bytes: Uint8Array; mediaType: string } | null;
 }
 
-interface LoadedBook extends BookSummary {
+interface LoadedBook extends Omit<BookSummary, 'cover'> {
   book: Book;
   sections: Section[];
 }
@@ -54,8 +57,15 @@ export type LoadResult = { ok: true; summary: BookSummary } | { ok: false; code:
 export function loadBook(bytes: Uint8Array, fileName: string): LoadResult {
   const read = readBook(bytes, fileName);
   if (!read.ok) return read;
-  const { title, authors, language } = read.book;
-  return { ok: true, summary: { title, authors, language } };
+  const { book, title, authors, language } = read.book;
+  const found = findCover(book);
+  const coverBytes = found === null ? null : book.readBytes(found.path);
+  const cover =
+    found === null || coverBytes === null
+      ? null
+      : // 复制一份：Worker 会把它交给主线程（transfer），不碰书里原来的数据
+        { bytes: coverBytes.slice(), mediaType: found.mediaType };
+  return { ok: true, summary: { title, authors, language, cover } };
 }
 
 export interface BookInput {

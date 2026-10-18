@@ -11,18 +11,27 @@ import { languageName, useLocale } from '../strings/index.tsx';
 export type SlotState =
   | { status: 'empty' }
   | { status: 'loading'; id: number; fileName: string }
-  | { status: 'ready'; id: number; fileName: string; bytes: Uint8Array; summary: BookSummary }
+  | {
+      status: 'ready';
+      id: number;
+      fileName: string;
+      bytes: Uint8Array;
+      summary: BookSummary;
+      /** 封面的临时网址（blob:），由 App 生成和释放；没有封面时是 null */
+      coverUrl: string | null;
+    }
   | { status: 'error'; id: number; fileName: string; code: string };
 
 interface Props {
   /** 1 = 排在前面（蓝色），2 = 排在后面（灰色） */
   position: 1 | 2;
   state: SlotState;
-  onFile: (file: File) => void;
+  /** 拖进来或选中的所有文件。一次给两本时，App 把它们分到两个框 */
+  onFiles: (files: File[]) => void;
   onRemove: () => void;
 }
 
-export function BookSlot({ position, state, onFile, onRemove }: Props) {
+export function BookSlot({ position, state, onFiles, onRemove }: Props) {
   const { t } = useLocale();
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -31,8 +40,8 @@ export function BookSlot({ position, state, onFile, onRemove }: Props) {
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file !== undefined) onFile(file);
+    const files = [...e.dataTransfer.files];
+    if (files.length > 0) onFiles(files);
   };
 
   const border =
@@ -46,7 +55,7 @@ export function BookSlot({ position, state, onFile, onRemove }: Props) {
 
   return (
     <div
-      className={`relative flex h-56 cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] px-4 text-center transition-colors ${border} ${dragging ? 'bg-blue-50' : 'bg-white'}`}
+      className={`relative flex h-64 cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] px-4 text-center transition-colors ${border} ${dragging ? 'bg-blue-50' : 'bg-white'}`}
       onClick={() => input.current?.click()}
       onDragOver={(e) => {
         e.preventDefault();
@@ -59,10 +68,11 @@ export function BookSlot({ position, state, onFile, onRemove }: Props) {
         ref={input}
         type="file"
         accept=".epub,application/epub+zip"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file !== undefined) onFile(file);
+          const files = [...(e.target.files ?? [])];
+          if (files.length > 0) onFiles(files);
           e.target.value = '';
         }}
       />
@@ -117,11 +127,7 @@ export function BookSlot({ position, state, onFile, onRemove }: Props) {
 
       {state.status === 'ready' && (
         <>
-          <div
-            className={`mt-4 flex h-[68px] w-[50px] items-center justify-center rounded ${first ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}
-          >
-            <IconBook size={22} />
-          </div>
+          <CoverImage key={state.coverUrl} url={state.coverUrl} first={first} />
           <p className="mt-2 line-clamp-2 text-[15px] font-medium text-gray-900">
             {state.summary.title}
           </p>
@@ -138,5 +144,27 @@ export function BookSlot({ position, state, onFile, onRemove }: Props) {
         </>
       )}
     </div>
+  );
+}
+
+/** 封面。没有封面、或者图片坏了，显示书本图标。key 是网址，换书时 broken 自动重置 */
+function CoverImage({ url, first }: { url: string | null; first: boolean }) {
+  const [broken, setBroken] = useState(false);
+  if (url === null || broken) {
+    return (
+      <div
+        className={`flex h-[104px] w-[72px] items-center justify-center rounded ${first ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}
+      >
+        <IconBook size={26} />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      onError={() => setBroken(true)}
+      className="h-[104px] w-[72px] rounded border border-gray-200 object-cover shadow-sm"
+    />
   );
 }

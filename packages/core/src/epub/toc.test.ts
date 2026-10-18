@@ -13,7 +13,7 @@ function fakeArchive(files: Record<string, string>): ZipArchive {
 function fakeOpf(navPath: string | null, ncxPath: string | null): OpfInfo {
   return {
     version: '3.0',
-    metadata: { title: '', creators: [], languages: [], identifier: null },
+    metadata: { title: '', creators: [], languages: [], identifier: null, coverId: null },
     manifest: new Map(),
     spine: [],
     navPath,

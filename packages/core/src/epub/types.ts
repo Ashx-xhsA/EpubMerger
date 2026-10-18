@@ -29,6 +29,8 @@ export interface BookMetadata {
   languages: string[];
   /** ISBN、UUID 等，取 package 的 unique-identifier 指向的那个 */
   identifier: string | null;
+  /** ePub 2 的 <meta name="cover" content="…"/> 里的 content，通常是封面图片在 manifest 里的 id。找封面用 findCover */
+  coverId: string | null;
 }
 
 export interface ManifestItem {

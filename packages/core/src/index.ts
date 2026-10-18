@@ -68,6 +68,8 @@ export type {
   GenerateResult,
   GenerateWarningCode,
 } from './generate/generate.ts';
+export { findCover } from './epub/cover.ts';
+export type { Cover } from './epub/cover.ts';
 export { parseEpub } from './epub/parse.ts';
 export { extractBlocks } from './extract/extract.ts';
 export type { Block, BlockKind, ExtractResult, FileInfo, Region } from './extract/types.ts';

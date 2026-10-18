@@ -141,17 +141,20 @@ function readMetadata(metadataEl: Element, pkg: Element): BookMetadata {
   const unique = identifiers.find((el) => uniqueId !== null && attr(el, 'id') === uniqueId);
   const identifierEl = unique ?? identifiers[0];
   const identifier = identifierEl === undefined ? '' : textOf(identifierEl);
+  // ePub 2 的封面：<meta name="cover" content="封面图片的 manifest id"/>
+  const coverMeta = findAll(metadataEl, 'meta').find((m) => attr(m, 'name') === 'cover');
 
   return {
     title: texts('title')[0] ?? '',
     creators: texts('creator'),
     languages: texts('language'),
     identifier: identifier === '' ? null : identifier,
+    coverId: coverMeta === undefined ? null : attr(coverMeta, 'content') || null,
   };
 }
 
 function emptyMetadata(): BookMetadata {
-  return { title: '', creators: [], languages: [], identifier: null };
+  return { title: '', creators: [], languages: [], identifier: null, coverId: null };
 }
 
 function isFixedLayout(metadataEl: Element): boolean {

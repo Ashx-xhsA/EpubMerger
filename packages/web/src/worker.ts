@@ -4,7 +4,12 @@ import * as Comlink from 'comlink';
 import { loadBook, mergeBooks } from './pipeline.ts';
 
 const api = {
-  loadBook,
+  loadBook(...args: Parameters<typeof loadBook>) {
+    const result = loadBook(...args);
+    // 封面的字节同样直接交给主线程
+    const cover = result.ok ? result.summary.cover : null;
+    return cover === null ? result : Comlink.transfer(result, [cover.bytes.buffer]);
+  },
   async mergeBooks(...args: Parameters<typeof mergeBooks>) {
     const result = await mergeBooks(...args);
     // 生成的字节直接交给主线程（transfer），不复制

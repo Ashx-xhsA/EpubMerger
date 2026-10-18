@@ -11,6 +11,7 @@ import {
   checkLanguagePair,
   detectLanguage,
   extractBlocks,
+  findCover,
   parseEpub,
   prefillChapters,
   splitChapters,
@@ -192,10 +193,18 @@ function describeBook(book: Book): string {
     `作者：${metadata.creators.join('、') || '（无）'}`,
     `语言（OPF 声明）：${metadata.languages.join(', ') || '（无）'}`,
     `ePub 版本：${book.version} · OPF：${book.opfPath}`,
+    `封面：${coverLine(book)}`,
     `spine：${book.spine.length} 个文件（其中 linear=no：${nonLinear} 个）`,
     `目录：${countEntries(book.toc)} 项，来源 ${book.tocSource}`,
     ...tocLines(book.toc, 1),
   ].join('\n');
+}
+
+function coverLine(book: Book): string {
+  const cover = findCover(book);
+  if (cover === null) return '无';
+  const size = book.readBytes(cover.path)?.length ?? 0;
+  return `${cover.path}（${cover.mediaType}，${Math.round(size / 1024)} KB）`;
 }
 
 function tocLines(entries: TocEntry[], depth: number): string[] {
