@@ -59,3 +59,18 @@ export function resolveHref(
     fragment: fragment === null ? null : safeDecodeUri(fragment),
   };
 }
+
+/**
+ * 从 fromDir 文件夹指向 zip 内路径 to 的相对链接，每段做 URL 编码。
+ * ("OEBPS/Text", "OEBPS/bilingual.css") → "../bilingual.css"
+ */
+export function relativePath(fromDir: string, to: string): string {
+  const from = fromDir.split('/').filter((p) => p !== '');
+  const target = to.split('/').filter((p) => p !== '');
+  let common = 0;
+  while (common < from.length && common < target.length - 1 && from[common] === target[common]) {
+    common++;
+  }
+  const up = from.slice(common).map(() => '..');
+  return [...up, ...target.slice(common).map(encodeURIComponent)].join('/');
+}

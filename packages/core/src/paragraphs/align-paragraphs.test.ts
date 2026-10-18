@@ -6,7 +6,16 @@ import type { Block } from '../extract/types.ts';
 import { alignParagraphs, isSymbolOnly, withSymbols } from './align-paragraphs.ts';
 
 function block(text: string): Block {
-  return { kind: 'para', text, html: '', file: 'a.xhtml', ids: [], className: '', region: 'body' };
+  return {
+    kind: 'para',
+    text,
+    html: '',
+    range: [0, 0],
+    file: 'a.xhtml',
+    ids: [],
+    className: '',
+    region: 'body',
+  };
 }
 
 /** 假的模型：文字里出现哪个关键词（中文用对应的词），就返回哪个方向的向量 */

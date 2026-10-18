@@ -12,7 +12,7 @@ function block(
   kind: Block['kind'] = 'para',
   ids: string[] = [],
 ): Block {
-  return { kind, text, html: '', file, ids, className: '', region: 'body' };
+  return { kind, text, html: '', range: [0, 0], file, ids, className: '', region: 'body' };
 }
 
 function book(files: string[], toc: TocEntry[]): Book {
@@ -24,6 +24,7 @@ function book(files: string[], toc: TocEntry[]): Book {
     spine: files.map((href) => ({ idref: href, href, linear: true })),
     toc,
     tocSource: toc.length > 0 ? 'nav' : 'none',
+    files: [],
     readText: () => null,
     readBytes: () => null,
   };

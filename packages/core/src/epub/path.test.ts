@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { dirname, resolveHref, resolvePath, safeDecodeUri, splitFragment } from './path.ts';
+import {
+  dirname,
+  relativePath,
+  resolveHref,
+  resolvePath,
+  safeDecodeUri,
+  splitFragment,
+} from './path.ts';
 
 describe('dirname', () => {
   it('returns the folder part', () => {
@@ -31,6 +38,15 @@ describe('safeDecodeUri', () => {
 
   it('keeps malformed encoding as is', () => {
     expect(safeDecodeUri('100%.xhtml')).toBe('100%.xhtml');
+  });
+});
+
+describe('relativePath', () => {
+  it('goes up out of the source folder and down into the target', () => {
+    expect(relativePath('OEBPS/Text', 'OEBPS/bilingual.css')).toBe('../bilingual.css');
+    expect(relativePath('OEBPS', 'OEBPS/bilingual.css')).toBe('bilingual.css');
+    expect(relativePath('', 'OEBPS/a b.css')).toBe('OEBPS/a%20b.css');
+    expect(relativePath('A/B', 'C/x.css')).toBe('../../C/x.css');
   });
 });
 

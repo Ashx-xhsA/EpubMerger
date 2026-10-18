@@ -64,6 +64,7 @@ export function extractBlocks(book: Book): ExtractResult {
         text: b.text,
         html: b.html,
         file: b.file,
+        range: b.range,
         ids: b.ids,
         className: b.className,
         region: b.inNote || pointedTo ? 'notes' : region,

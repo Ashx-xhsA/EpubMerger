@@ -12,3 +12,6 @@ declare class TextDecoder {
 declare class TextEncoder {
   encode(input?: string): Uint8Array;
 }
+
+/** 生成随机 UUID（新书的 identifier 用）。Node 19+ 和浏览器（安全上下文）都内置 */
+declare const crypto: { randomUUID(): string };

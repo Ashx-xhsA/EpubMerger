@@ -3,7 +3,16 @@ import type { Block, Region } from '../extract/types.ts';
 import { detectLanguage, evenSample } from './detect.ts';
 
 function block(text: string, region: Region = 'body', kind: Block['kind'] = 'para'): Block {
-  return { kind, text, html: '', file: 'text.xhtml', ids: [], className: '', region };
+  return {
+    kind,
+    text,
+    html: '',
+    range: [0, 0],
+    file: 'text.xhtml',
+    ids: [],
+    className: '',
+    region,
+  };
 }
 
 /** 一本由这些段落轮流重复 n 次组成的书 */

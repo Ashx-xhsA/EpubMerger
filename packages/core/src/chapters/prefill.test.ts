@@ -6,7 +6,16 @@ import type { Section } from './map.ts';
 import { headAndTail, prefillChapters, sectionVectors } from './prefill.ts';
 
 function block(text: string): Block {
-  return { kind: 'para', text, html: '', file: 'a.xhtml', ids: [], className: '', region: 'body' };
+  return {
+    kind: 'para',
+    text,
+    html: '',
+    range: [0, 0],
+    file: 'a.xhtml',
+    ids: [],
+    className: '',
+    region: 'body',
+  };
 }
 
 const section = (title: string, ...texts: string[]): Section => ({

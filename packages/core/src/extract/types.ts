@@ -34,6 +34,11 @@ export interface Block {
   text: string;
   /** 原始 HTML，0.11 生成时用 */
   html: string;
+  /**
+   * 块在所在文件文字（book.readText 的结果）里的位置，像 Python 的切片 text[start:end]，
+   * 两者之间就是 html。生成 ePub 时按这个位置插入另一本书的段落
+   */
+  range: [number, number];
   /** 所在 spine 文件的 zip 内路径 */
   file: string;
   /**

@@ -3,7 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { escapeHtml, mapHtml, preview } from './chapters.ts';
 
 function block(text: string, region: Block['region'] = 'body'): Block {
-  return { kind: 'para', text, html: '', file: 'a.xhtml', ids: [], className: '', region };
+  return {
+    kind: 'para',
+    text,
+    html: '',
+    range: [0, 0],
+    file: 'a.xhtml',
+    ids: [],
+    className: '',
+    region,
+  };
 }
 
 describe('preview', () => {

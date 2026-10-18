@@ -13,6 +13,8 @@ export interface Book {
   toc: TocEntry[];
   /** 目录是从哪里读到的 */
   tocSource: 'nav' | 'ncx' | 'none';
+  /** zip 里所有文件的路径（不含文件夹），生成 ePub 时原样复制骨架书的文件用 */
+  files: string[];
   /** 按 zip 内路径读出文件的文字（自动处理编码和 %20 等写法），文件不存在时返回 null */
   readText(path: string): string | null;
   /** 按 zip 内路径原样读出字节（图片、字体用），文件不存在时返回 null */

@@ -6,6 +6,7 @@ const block: Block = {
   kind: 'para',
   text: 'x',
   html: '',
+  range: [0, 0],
   file: 'a',
   ids: [],
   className: '',

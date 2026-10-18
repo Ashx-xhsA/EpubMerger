@@ -2,7 +2,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
-  alignParagraphs,
+  alignBook,
+  generateBilingual,
+  toBlockPairs,
   CHAPTER_THRESHOLD,
   CORE_VERSION,
   chapterSections,
@@ -16,6 +18,7 @@ import {
   withTitles,
   type Block,
   type Book,
+  type ParseWarning,
   type BookLanguage,
   type ChapterMap,
   type ChapterResult,
@@ -25,7 +28,7 @@ import {
 import { loadE5 } from './embed.ts';
 
 const USAGE = `Usage:
-  pnpm cli merge <en.epub> <zh.epub> -o <out.epub>
+  pnpm cli merge <en.epub> <zh.epub> -o <out.epub> [--map <file>] [--skeleton en|zh] [--first en|zh] [--layout stacked|columns] [--length]
   pnpm cli inspect <book.epub>
   pnpm cli blocks <book.epub> [--text]
   pnpm cli chapters <book.epub> [--ignore-toc]
@@ -44,6 +47,9 @@ const { values, positionals } = parseArgs({
     prefill: { type: 'string', default: 'meaning' },
     threshold: { type: 'string', default: String(CHAPTER_THRESHOLD) },
     length: { type: 'boolean' },
+    skeleton: { type: 'string', default: 'en' },
+    first: { type: 'string' },
+    layout: { type: 'string', default: 'stacked' },
   },
 });
 
@@ -81,16 +87,34 @@ if (command === 'lang' && (args.length === 1 || args.length === 2)) {
 }
 
 if (command === 'align' && args.length === 2 && args[0] && args[1]) {
-  process.exit(await alignBook(args[0], args[1], values.length === true));
+  process.exit(await alignCommand(args[0], args[1], values.length === true));
 }
 
 const [enPath, zhPath] = args;
-if (command !== 'merge' || !enPath || !zhPath || !values.output) {
+const skeleton = values.skeleton;
+const first = values.first ?? skeleton;
+const layout = values.layout;
+if (
+  command !== 'merge' ||
+  !enPath ||
+  !zhPath ||
+  !values.output ||
+  (skeleton !== 'en' && skeleton !== 'zh') ||
+  (first !== 'en' && first !== 'zh') ||
+  (layout !== 'stacked' && layout !== 'columns')
+) {
   console.error(USAGE);
   process.exit(1);
 }
 
-console.log(`merge ${enPath} + ${zhPath} -> ${values.output} (not implemented yet)`);
+process.exit(
+  await merge(enPath, zhPath, values.output, {
+    skeleton,
+    otherFirst: first !== skeleton,
+    layout,
+    lengthOnly: values.length === true,
+  }),
+);
 
 /** 打印一本书的解析结果，返回退出码：0 成功，1 失败 */
 function inspect(path: string): number {
@@ -304,7 +328,7 @@ async function chapterMap(
  * 按确认过的章节表逐组配段落，打印每组配成几对、几段没有对应。
  * lengthOnly 时不加载模型，只按长度配。返回退出码：读不了书或章节表有问题时 1
  */
-async function alignBook(enPath: string, zhPath: string, lengthOnly: boolean): Promise<number> {
+async function alignCommand(enPath: string, zhPath: string, lengthOnly: boolean): Promise<number> {
   const en = readSections(enPath);
   const zh = readSections(zhPath);
   if (typeof en === 'string' || typeof zh === 'string') {
@@ -326,28 +350,24 @@ async function alignBook(enPath: string, zhPath: string, lengthOnly: boolean): P
 
   const start = performance.now();
   const embedder = lengthOnly ? undefined : await loadE5();
+  const aligned = await alignBook(map.groups, en, zh, { embedder });
   const total = { pairs: 0, enOnly: 0, zhOnly: 0 };
-  let method = '';
-  for (const [k, g] of map.groups.entries()) {
-    const enBlocks = g.en.flatMap((i) => en[i]!.blocks);
-    const zhBlocks = g.zh.flatMap((i) => zh[i]!.blocks);
-    if (enBlocks.length === 0 || zhBlocks.length === 0) continue;
-    const result = await alignParagraphs(enBlocks, zhBlocks, { embedder });
-    method = result.method;
-    const pairs = result.pairs.filter((p) => p.en.length > 0 && p.zh.length > 0).length;
-    const enOnly = result.pairs.filter((p) => p.zh.length === 0).length;
-    const zhOnly = result.pairs.filter((p) => p.en.length === 0).length;
+  for (const g of aligned.groups) {
+    const pairs = g.pairs.filter((p) => p.en.length > 0 && p.zh.length > 0).length;
+    const enOnly = g.pairs.filter((p) => p.zh.length === 0).length;
+    const zhOnly = g.pairs.filter((p) => p.en.length === 0).length;
     total.pairs += pairs;
     total.enOnly += enOnly;
     total.zhOnly += zhOnly;
+    const group = map.groups[g.index]!;
     const titles = (ids: number[], sections: Section[]) =>
       ids.map((i) => sections[i]!.title).join(' + ');
     console.log(
-      `[${k}] ${titles(g.en, en)} ↔ ${titles(g.zh, zh)}：英 ${enBlocks.length} 段、中 ${zhBlocks.length} 段，` +
+      `[${g.index}] ${titles(group.en, en)} ↔ ${titles(group.zh, zh)}：英 ${g.en.length} 段、中 ${g.zh.length} 段，` +
         `配成 ${pairs} 对，英文没对应 ${enOnly}，中文没对应 ${zhOnly}`,
     );
   }
-  const how = method === 'combined' ? '长度 + 意思' : '只按长度';
+  const how = aligned.method === 'combined' ? '长度 + 意思' : '只按长度';
   console.log(
     `\n共配成 ${total.pairs} 对，英文没对应 ${total.enOnly} 段，中文没对应 ${total.zhOnly} 段` +
       `（${how}，${((performance.now() - start) / 1000).toFixed(1)} 秒）`,
@@ -393,4 +413,161 @@ function preview(blocks: Block[], side: 'en' | 'zh'): string {
 
 function countEntries(entries: TocEntry[]): number {
   return entries.reduce((n, e) => n + 1 + countEntries(e.children), 0);
+}
+
+/** 一本书读进来：书、全部块、章节 */
+function loadBook(
+  path: string,
+): { book: Book; blocks: Block[]; sections: Section[]; warnings: ParseWarning[] } | string {
+  const result = parseEpub(readFileSync(path));
+  if (!result.ok) return `${result.error.code}：${result.error.message}`;
+  const all = extractBlocks(result.book).blocks;
+  return {
+    book: result.book,
+    blocks: all,
+    sections: chapterSections(splitChapters(result.book, all), all),
+    warnings: result.warnings,
+  };
+}
+
+/** 生成双语 ePub，写出后读回检查。返回退出码：0 成功，1 失败 */
+async function merge(
+  enPath: string,
+  zhPath: string,
+  outPath: string,
+  options: {
+    skeleton: 'en' | 'zh';
+    otherFirst: boolean;
+    layout: 'stacked' | 'columns';
+    lengthOnly: boolean;
+  },
+): Promise<number> {
+  const start = performance.now();
+  const en = loadBook(enPath);
+  const zh = loadBook(zhPath);
+  if (typeof en === 'string' || typeof zh === 'string') {
+    if (typeof en === 'string') console.log(`✗ ${enPath}：${en}`);
+    if (typeof zh === 'string') console.log(`✗ ${zhPath}：${zh}`);
+    return 1;
+  }
+
+  // 语言：有错误就停下；不确定时按参数位置当成 en / zh-Hans
+  const enLang = detectLanguage(en.blocks).language;
+  const zhLang = detectLanguage(zh.blocks).language;
+  const check = checkLanguagePair(enLang, zhLang);
+  for (const issue of check.issues) {
+    console.log(`${issue.level === 'error' ? '✗' : '⚠'} 语言：${issue.code}（${issue.bookSide}）`);
+  }
+  if (!check.ok) return 1;
+  const langOf = (l: BookLanguage, fallback: string) => (l.kind === 'single' ? l.lang : fallback);
+  const langs = { en: langOf(enLang, 'en'), zh: langOf(zhLang, 'zh-Hans') };
+
+  // 章节表：没有就自动预填（没经过确认）
+  const embedder = options.lengthOnly ? undefined : await loadE5();
+  const mapPath = values.map ?? join(dirname(enPath), 'chapters.json');
+  let map: ChapterMap;
+  if (existsSync(mapPath)) {
+    map = JSON.parse(readFileSync(mapPath, 'utf8')) as ChapterMap;
+    const problems = validateChapterMap(map.groups, en.sections.length, zh.sections.length);
+    if (problems.length > 0) {
+      console.log(`✗ 章节表有问题：\n  ${problems.join('\n  ')}`);
+      return 1;
+    }
+  } else {
+    const result = await prefillChapters(en.sections, zh.sections, { embedder });
+    map = { groups: result.groups };
+    console.log(
+      `⚠ 没有章节表 ${mapPath}，已自动预填（${result.method === 'meaning' ? '按意思' : '按顺序'}），没经过确认`,
+    );
+  }
+
+  const aligned = await alignBook(map.groups, en.sections, zh.sections, { embedder });
+  const alignedAt = performance.now();
+  const pairs = toBlockPairs(aligned, options.skeleton);
+  const skel = options.skeleton === 'en' ? en : zh;
+  const result = generateBilingual({
+    skeleton: skel.book,
+    skeletonLang: options.skeleton === 'en' ? langs.en : langs.zh,
+    otherLang: options.skeleton === 'en' ? langs.zh : langs.en,
+    pairs,
+    otherFirst: options.otherFirst,
+    layout: options.layout,
+    title: `${en.book.metadata.title} / ${zh.book.metadata.title}（中英双语）`,
+  });
+  if (!result.ok) {
+    console.log(`✗ 生成失败：${result.message}`);
+    return 1;
+  }
+  const generatedAt = performance.now();
+  writeFileSync(outPath, result.bytes);
+
+  const { report } = result;
+  const otherCount = pairs.reduce((n, p) => n + p.other.length, 0);
+  const secs = (from: number, to: number) => ((to - from) / 1000).toFixed(1);
+  console.log(
+    `✓ ${outPath}（${(result.bytes.length / 1024 / 1024).toFixed(1)} MB）\n` +
+      `  骨架 ${options.skeleton}，${options.otherFirst ? '另一本在前' : '骨架在前'}，${options.layout === 'columns' ? `两栏（${report.rows} 对包成表格，${report.columnFallbacks} 对退回上下交替）` : '上下交替'}，配对${aligned.method === 'combined' ? '长度 + 意思' : '只按长度'}\n` +
+      `  另一本参与配对 ${otherCount} 段：插入 ${report.inserted}，丢掉 ${report.dropped.length}，改了 ${report.changedFiles.length} 个文件\n` +
+      `  耗时：读书 + 配对 ${secs(start, alignedAt)} 秒，生成 ${secs(alignedAt, generatedAt)} 秒`,
+  );
+  for (const d of report.dropped.slice(0, 5)) console.log(`  丢掉（${d.reason}）：${d.text}`);
+  if (report.dropped.length > 5) console.log(`  ……共 ${report.dropped.length} 段`);
+  for (const w of report.warnings.slice(0, 5)) console.log(`  ⚠ ${w.code}：${w.message}`);
+  if (report.warnings.length > 5) console.log(`  ……共 ${report.warnings.length} 条警告`);
+
+  // 插入段落的字数：有段落被丢掉或清理后为空时算不准，不查
+  const complete =
+    report.dropped.length === 0 && !report.warnings.some((w) => w.code === 'EMPTY_BLOCK');
+  const insertedChars = complete ? chars(pairs.flatMap((p) => p.other)) : null;
+  const problems = verifyOutput(
+    result.bytes,
+    skel,
+    { count: report.inserted, chars: insertedChars },
+    options.layout,
+  );
+  if (problems.length > 0) {
+    console.log(`✗ 读回检查：\n  ${problems.join('\n  ')}`);
+    return 1;
+  }
+  console.log('✓ 读回检查通过');
+  return 0;
+}
+
+/**
+ * 读回检查：输出能被 parseEpub 读出、没有骨架书原来没有的警告；改过的文件里没有新的重复 id；
+ * 字数（去掉空白）= 骨架书 + 插入的段落（有段落被丢掉或清理后为空时不查）；
+ * 上下交替时再查块数 = 骨架书 + 插入数（两栏时整个表格是一块，不查）。返回发现的问题
+ */
+function verifyOutput(
+  bytes: Uint8Array,
+  skeleton: { book: Book; blocks: Block[]; warnings: ParseWarning[] },
+  inserted: { count: number; chars: number | null },
+  layout: 'stacked' | 'columns',
+): string[] {
+  const result = parseEpub(bytes);
+  if (!result.ok) return [`parseEpub：${result.error.code}：${result.error.message}`];
+  const problems: string[] = [];
+  const known = new Set(skeleton.warnings.map((w) => w.code));
+  for (const w of result.warnings) {
+    if (!known.has(w.code)) problems.push(`新警告 ${w.code}：${w.message}`);
+  }
+  const blocks = extractBlocks(result.book).blocks;
+  if (inserted.chars !== null) {
+    const expected = chars(skeleton.blocks) + inserted.chars;
+    if (chars(blocks) !== expected) problems.push(`字数 ${chars(blocks)}，应该是 ${expected}`);
+  }
+  if (layout === 'stacked' && blocks.length !== skeleton.blocks.length + inserted.count) {
+    problems.push(`块数 ${blocks.length}，应该是 ${skeleton.blocks.length + inserted.count}`);
+  }
+  for (const item of skeleton.book.spine) {
+    const before = duplicateIds(skeleton.book.readText(item.href) ?? '');
+    const after = duplicateIds(result.book.readText(item.href) ?? '');
+    if (after > before) problems.push(`${item.href}：重复 id ${before} → ${after}`);
+  }
+  return problems;
+}
+
+function duplicateIds(xhtml: string): number {
+  const ids = [...xhtml.matchAll(/\sid\s*=\s*["']([^"']*)["']/g)].map((m) => m[1]);
+  return ids.length - new Set(ids).size;
 }

@@ -14,8 +14,15 @@ import { DomUtils, parseDocument } from 'htmlparser2';
 
 export type { Document, Element };
 
-export function parseXml(text: string): Document {
-  return parseDocument(text, { xmlMode: true, decodeEntities: false });
+/** withIndices：记下每个节点在 text 里的起止位置（startIndex / endIndex），生成 ePub 时按位置插入用 */
+export function parseXml(text: string, options: { withIndices?: boolean } = {}): Document {
+  const indices = options.withIndices ?? false;
+  return parseDocument(text, {
+    xmlMode: true,
+    decodeEntities: false,
+    withStartIndices: indices,
+    withEndIndices: indices,
+  });
 }
 
 /** "dc:title" → "title"，并转成小写 */

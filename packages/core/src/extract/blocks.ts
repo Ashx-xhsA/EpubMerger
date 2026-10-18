@@ -122,6 +122,11 @@ function collectIds(nodes: AnyNode[]): string[] {
   return ids;
 }
 
+/** 一串相邻节点在原文里的位置 [start, end)。解析时要打开 withIndices */
+function rangeOf(nodes: AnyNode[]): [number, number] {
+  return [nodes[0]?.startIndex ?? 0, (nodes.at(-1)?.endIndex ?? -1) + 1];
+}
+
 function outerHtml(nodes: AnyNode | AnyNode[]): string {
   // 解析时没有解码实体，这里也不重新编码，原样输出
   return DomUtils.getOuterHTML(nodes, { xmlMode: true, decodeEntities: false });
@@ -139,7 +144,7 @@ function kindOf(el: Element, text: string): { kind: BlockKind; headingLevel?: nu
 
 /** 把一个 XHTML 文件切成块。file 是它在 zip 里的路径，原样记到每个块上 */
 export function splitBlocks(xhtml: string, file: string): SplitResult {
-  const doc = parseXml(xhtml);
+  const doc = parseXml(xhtml, { withIndices: true });
   const root = findFirst(doc, 'body') ?? doc;
   const blocks: RawBlock[] = [];
   // 还没有落到某个块上的 id：容器自己的 id、被丢掉的空块里的 id。交给下一个块
@@ -148,12 +153,13 @@ export function splitBlocks(xhtml: string, file: string): SplitResult {
   let noteDepth = 0;
 
   const emit = (
-    block: Omit<RawBlock, 'file' | 'inNote' | 'hasLink' | 'startsWithLink'>,
+    block: Omit<RawBlock, 'file' | 'range' | 'inNote' | 'hasLink' | 'startsWithLink'>,
     nodes: AnyNode[],
   ): void => {
     blocks.push({
       ...block,
       file,
+      range: rangeOf(nodes),
       ids: [...pending, ...block.ids],
       inNote: noteDepth > 0,
       hasLink: hasLink(nodes),

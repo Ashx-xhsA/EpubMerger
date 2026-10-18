@@ -7,6 +7,7 @@ const block = (text: string): Block => ({
   kind: 'para',
   text,
   html: '',
+  range: [0, 0],
   file: 'a.xhtml',
   ids: [],
   className: '',

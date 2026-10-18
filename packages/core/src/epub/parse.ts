@@ -75,6 +75,7 @@ export function parseEpub(bytes: Uint8Array, limits?: ZipLimits): ParseResult {
     spine: opf.spine,
     toc: toc.toc,
     tocSource: toc.source,
+    files: archive.paths,
     readBytes,
     readText: (path) => {
       const data = readBytes(path);

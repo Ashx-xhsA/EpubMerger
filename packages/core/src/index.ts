@@ -54,6 +54,15 @@ export type {
   ParagraphAlignment,
   ParagraphOptions,
 } from './paragraphs/align-paragraphs.ts';
+export { alignBook, toBlockPairs } from './paragraphs/align-book.ts';
+export type { BlockPair, BookAlignment, GroupAlignment } from './paragraphs/align-book.ts';
+export { BILINGUAL_CSS, generateBilingual } from './generate/generate.ts';
+export type {
+  GenerateInput,
+  GenerateReport,
+  GenerateResult,
+  GenerateWarningCode,
+} from './generate/generate.ts';
 export { parseEpub } from './epub/parse.ts';
 export { extractBlocks } from './extract/extract.ts';
 export type { Block, BlockKind, ExtractResult, FileInfo, Region } from './extract/types.ts';

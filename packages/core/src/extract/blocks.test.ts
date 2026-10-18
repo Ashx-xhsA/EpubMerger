@@ -153,4 +153,35 @@ describe('splitBlocks', () => {
     ]);
     expect(split('<section epub:type="chapter"><p>A</p></section><p>B</p>').rootTypes).toEqual([]);
   });
+
+  describe('range', () => {
+    const wrap = (body: string) =>
+      `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head><body>${body}</body></html>`;
+
+    it('points at the block in the original text for every kind of block', () => {
+      const body =
+        '<h1 id="c1">Title</h1><div id="w"><p class="a">One &amp; <i>two</i>.</p>' +
+        'Loose <b>text</b><p>Para</p></div><table><tr><td>Cell</td></tr></table>' +
+        '<div><img src="a.jpg"/></div><ul><li>Item</li></ul><p>* * *</p>';
+      const xhtml = wrap(body);
+      const { blocks } = splitBlocks(xhtml, 'a.xhtml');
+      expect(blocks.map((b) => xhtml.slice(...b.range))).toEqual(blocks.map((b) => b.html));
+      expect(blocks.map((b) => xhtml.slice(...b.range))).toEqual([
+        '<h1 id="c1">Title</h1>',
+        '<p class="a">One &amp; <i>two</i>.</p>',
+        'Loose <b>text</b>',
+        '<p>Para</p>',
+        '<table><tr><td>Cell</td></tr></table>',
+        '<div><img src="a.jpg"/></div>',
+        '<li>Item</li>',
+        '<p>* * *</p>',
+      ]);
+    });
+
+    it('keeps the original spelling even where html is re-serialized', () => {
+      const xhtml = wrap("<p class='a'>One<br />two</p>");
+      const [block] = splitBlocks(xhtml, 'a.xhtml').blocks;
+      expect(xhtml.slice(...block!.range)).toBe("<p class='a'>One<br />two</p>");
+    });
+  });
 });

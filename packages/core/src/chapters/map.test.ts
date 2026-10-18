@@ -14,7 +14,7 @@ function block(
   region: Block['region'] = 'body',
   kind: Block['kind'] = 'para',
 ): Block {
-  return { kind, text, html: '', file: 'a.xhtml', ids: [], className: '', region };
+  return { kind, text, html: '', range: [0, 0], file: 'a.xhtml', ids: [], className: '', region };
 }
 
 describe('alignableBlocks', () => {
