@@ -122,9 +122,26 @@ export const en = {
         : `The table of contents of “${title}” is incomplete, so it was split by file into ${count} sections. Matching will be less accurate; an edition with a complete table of contents works better.`,
   } as Record<ChapterWarningCode, (title: string, count: number) => string>,
 
+  range: {
+    title: 'Step 1 · Where does the main text start and end?',
+    hint: 'We made a guess — please check both books. Sections outside the range (copyright, contents, acknowledgements, previews of the next book…) won’t be merged.',
+    start: 'Start',
+    end: 'End',
+    outside: 'not merged',
+    gap: (n: number) => `${n} more ${n === 1 ? 'section' : 'sections'} in between`,
+    collapseGap: 'Fold the middle',
+    restore: 'Back to our guess',
+    next: 'Next: check chapter matching',
+  },
+
   chapters: {
-    title: 'Chapter matching',
-    hint: 'We matched the chapters by length to start with — check before merging. Blue sections are matched with the one beside them. Grey dashed ones are unmatched: on the left they stay in the book without a translation; on the right they are left out.',
+    title: 'Step 2 · Chapter matching',
+    rangeLine: (first: string, second: string) => `Main text: ${first}  ↔  ${second}`,
+    rangeSpan: (start: string, end: string) =>
+      start === end ? `“${start}”` : `“${start}” – “${end}”`,
+    editRange: 'Change',
+    refilled: 'Matched the chapters again for the new main-text range.',
+    hint: 'Within the main text we matched the chapters by length — check before merging. Blue sections are matched with the one beside them. Grey dashed ones are unmatched: on the left they stay in the book without a translation; on the right they are left out.',
     preparing: 'Sorting out the chapters…',
     prepareFailed: (message: string) => `Couldn't read the chapters: ${message}`,
     restore: 'Reset',

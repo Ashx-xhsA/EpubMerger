@@ -99,9 +99,25 @@ export const zh: Strings = {
         : `《${title}》的目录不完整，已按文件分成 ${count} 节，对齐会不太准。最好换一个目录完整的版本。`,
   },
 
+  range: {
+    title: '第一步 · 正文从哪里开始、到哪里结束？',
+    hint: '我们先猜了一下，请两本书都看一眼。首尾之外的节（版权页、目录、致谢、下一本的试读……）不会合并。',
+    start: '开头',
+    end: '结尾',
+    outside: '不合并',
+    gap: (n) => `中间还有 ${n} 节`,
+    collapseGap: '收起中间',
+    restore: '恢复我们猜的',
+    next: '下一步：检查章节配对',
+  },
+
   chapters: {
-    title: '章节对照表',
-    hint: '程序已经按长度先配了一遍，合并前请检查。蓝色是配上的，同一行左右对应。灰色虚线框是没配上的：左边的照样留在书里、只有原文，右边的不收录。',
+    title: '第二步 · 章节对照表',
+    rangeLine: (first, second) => `正文范围：${first}  ↔  ${second}`,
+    rangeSpan: (start, end) => (start === end ? `「${start}」` : `「${start}」–「${end}」`),
+    editRange: '修改',
+    refilled: '已按新的正文范围重新配了章节。',
+    hint: '程序已经在正文范围内按长度配了一遍，合并前请检查。蓝色是配上的，同一行左右对应。灰色虚线框是没配上的：左边的照样留在书里、只有原文，右边的不收录。',
     preparing: '正在整理章节…',
     prepareFailed: (message) => `读取章节失败：${message}`,
     restore: '恢复预填',

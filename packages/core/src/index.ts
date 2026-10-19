@@ -26,6 +26,9 @@ export {
   headAndTail,
   nonEmpty,
   pairByLength,
+  pairFromAnchor,
+  pairLengths,
+  pairLengthsFromAnchor,
   pairByMeaning,
   prefillChapters,
   prefillSectionsByOrder,
@@ -33,7 +36,8 @@ export {
   sectionVectors,
   toGroups,
 } from './chapters/prefill.ts';
-export type { PrefillOptions, PrefillResult } from './chapters/prefill.ts';
+export type { Anchor, PrefillOptions, PrefillResult } from './chapters/prefill.ts';
+export { guessAnchors } from './chapters/anchors.ts';
 export { splitChapters } from './chapters/split.ts';
 export type {
   Chapter,

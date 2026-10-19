@@ -1,6 +1,6 @@
 // 调用 core 的整条流程，只在 Web Worker 里跑（worker.ts）。不依赖 React。
-// 顺序照抄 cli 的 merge：解析 → 抽块 → 切章 → 识别语言 → 章节表（prepareChapters 按长度预填，
-// 用户在界面上确认后传回 mergeBooks）→ 只按长度配段落 → 生成
+// 顺序照抄 cli 的 merge：解析 → 抽块 → 切章 → 识别语言 → 章节表（prepareChapters 猜正文首尾，
+// 用户确认首尾后由主线程按长度预填，再改好表传回 mergeBooks）→ 只按长度配段落 → 生成
 // Worker 不保存书：主线程留着文件字节，合并时再传一次、重新解析（取消 = 杀掉 Worker，见 worker-client.ts）
 
 import {
@@ -11,14 +11,15 @@ import {
   extractBlocks,
   findCover,
   generateBilingual,
+  guessAnchors,
   parseEpub,
-  prefillChapters,
   sectionChars,
   splitChapters,
   toBlockPairs,
   validateChapterMap,
 } from '@epubmerger/core';
 import type {
+  Anchor,
   Book,
   BookLanguage,
   ChapterGroup,
@@ -120,11 +121,17 @@ export interface SectionInfo {
   empty: boolean;
 }
 
+/** 两本书正文的首尾，en 一侧是第一本 */
+export interface BodyRange {
+  from: Anchor;
+  to: Anchor;
+}
+
 export interface PreparedChapters {
   first: SectionInfo[];
   second: SectionInfo[];
-  /** 按长度预填的章节表，en 一侧是第一本 */
-  groups: ChapterGroup[];
+  /** 猜的正文首尾（1.6）。用户确认后，主线程按它预填章节表（bodyRange.ts） */
+  range: BodyRange;
 }
 
 export type PrepareResult =
@@ -149,21 +156,21 @@ const sectionInfo = (s: Section): SectionInfo => ({
   empty: s.blocks.length === 0,
 });
 
-/** 两本都读好后调用：给章节表准备两本的节列表和预填 */
-export async function prepareChapters(
-  firstInput: BookInput,
-  secondInput: BookInput,
-): Promise<PrepareResult> {
+/** 两本都读好后调用：给章节表准备两本的节列表，并猜正文首尾 */
+export function prepareChapters(firstInput: BookInput, secondInput: BookInput): PrepareResult {
   const firstRead = readBook(firstInput.bytes, firstInput.fileName);
   const secondRead = readBook(secondInput.bytes, secondInput.fileName);
   if (!firstRead.ok) return { ok: false, message: firstRead.code };
   if (!secondRead.ok) return { ok: false, message: secondRead.code };
   const [first, second] = [firstRead.book.sections, secondRead.book.sections];
-  // 网页里没有向量模型（Phase 2 才接），按长度预填（trade-off 032）
-  const { groups } = await prefillChapters(first, second, { fallback: 'length' });
+  // 标题词表只在 Worker 里用，所以首尾在这里猜；预填只要字数，放在主线程（trade-off 033）
   return {
     ok: true,
-    chapters: { first: first.map(sectionInfo), second: second.map(sectionInfo), groups },
+    chapters: {
+      first: first.map(sectionInfo),
+      second: second.map(sectionInfo),
+      range: guessAnchors(first, second),
+    },
   };
 }
 

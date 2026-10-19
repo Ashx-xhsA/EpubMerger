@@ -89,13 +89,64 @@ export function sectionChars(s: Section): number {
  * 0.4a / 0.4b 里用户要改的行比按顺序少（9 本合计 93 vs 170）。结果没有排回书的顺序，空节在最后
  */
 export function pairByLength(en: Section[], zh: Section[]): ChapterGroup[] {
-  const enIds = nonEmpty(en);
-  const zhIds = nonEmpty(zh);
+  return pairLengths(en.map(charsOrZero), zh.map(charsOrZero));
+}
+
+/** 字数；没有块的节算 0（空节） */
+const charsOrZero = (s: Section) => (s.blocks.length === 0 ? 0 : sectionChars(s));
+
+/**
+ * 按长度配对，只要每节的字数（0 是空节）。网页主线程只有字数没有正文，用这个版本；
+ * 结果和 pairByLength 一样：没有排回书的顺序，空节在最后
+ */
+export function pairLengths(enChars: number[], zhChars: number[]): ChapterGroup[] {
+  const ids = (chars: number[]) => chars.flatMap((n, i) => (n > 0 ? [i] : []));
+  const enIds = ids(enChars);
+  const zhIds = ids(zhChars);
   const cost = lengthCost(
-    enIds.map((i) => sectionChars(en[i]!)),
-    zhIds.map((j) => sectionChars(zh[j]!)),
+    enIds.map((i) => enChars[i]!),
+    zhIds.map((j) => zhChars[j]!),
   );
-  return toGroups(align(enIds.length, zhIds.length, cost), enIds, zhIds, en, zh);
+  const groups: ChapterGroup[] = align(enIds.length, zhIds.length, cost).map((p) => ({
+    en: p.en.map((i) => enIds[i]!),
+    zh: p.zh.map((j) => zhIds[j]!),
+  }));
+  enChars.forEach((n, i) => n === 0 && groups.push({ en: [i], zh: [] }));
+  zhChars.forEach((n, j) => n === 0 && groups.push({ en: [], zh: [j] }));
+  return groups;
+}
+
+/** 两本书里的一节，一边一个：正文的第一节或最后一节（用户在章节表之前选，或者 guessAnchors 猜的） */
+export interface Anchor {
+  en: number;
+  zh: number;
+}
+
+/**
+ * 从第一章配到最后一章：首尾之外的节（版权页、目录、后记、下一本的试读……）一律不合并，
+ * 中间按长度配。两头的杂页长度对不上，是按长度预填错开的主要原因（1.6）。to 不给时一直配到最后。
+ * 结果按书的顺序排
+ */
+export function pairFromAnchor(
+  en: Section[],
+  zh: Section[],
+  from: Anchor,
+  to?: Anchor,
+): ChapterGroup[] {
+  return pairLengthsFromAnchor(en.map(charsOrZero), zh.map(charsOrZero), from, to);
+}
+
+/** pairFromAnchor 只要字数的版本，网页主线程用 */
+export function pairLengthsFromAnchor(
+  enChars: number[],
+  zhChars: number[],
+  from: Anchor,
+  to: Anchor = { en: enChars.length - 1, zh: zhChars.length - 1 },
+): ChapterGroup[] {
+  // 范围外的节当成空节：不参与配对，各自成为不合并的一组
+  const cut = (chars: number[], lo: number, hi: number) =>
+    chars.map((n, i) => (i < lo || i > hi ? 0 : n));
+  return inBookOrder(pairLengths(cut(enChars, from.en, to.en), cut(zhChars, from.zh, to.zh)));
 }
 
 export interface PrefillOptions {

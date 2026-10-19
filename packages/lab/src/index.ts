@@ -3,6 +3,10 @@ import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   cosine,
+  guessAnchors,
+  inBookOrder,
+  pairByLength,
+  pairFromAnchor,
   prefillChapters,
   sectionVectors,
   validateChapterMap,
@@ -55,6 +59,7 @@ const USAGE = `Usage:
   pnpm lab paragraphs [--model ${MODEL_KEYS.join('|')}] [--threshold 0.75] [--lambda 200] <en.epub> <zh.epub>
   pnpm lab compare [--threshold 0.75] [--lambdas 20,50,100] <pair-dir> [...]
   pnpm lab chapter-test [--thresholds 0.75,0.8,0.85] [--lambdas 20,50,100] <pair-dir> [...]
+  pnpm lab anchor-test <pair-dir> [...]
   pnpm lab gold <en.epub> <zh.epub>
   pnpm lab eval [--out results.json] <pair-dir> [...]
   pnpm lab gold-check --out check.html <pair-dir> [...]`;
@@ -116,6 +121,8 @@ if (command === 'bench' && args.length >= 1 && (model === 'all' || isModelKey(mo
   await evaluate(args, model);
 } else if (command === 'compare' && args.length >= 1 && isModelKey(model)) {
   await compare(args, model);
+} else if (command === 'anchor-test' && args.length >= 1) {
+  anchorTest(args);
 } else if (command === 'chapter-test' && args.length >= 1 && isModelKey(model)) {
   await chapterTest(args, model);
 } else if (!isModelKey(model)) {
@@ -416,6 +423,72 @@ async function chapterTest(dirs: string[], key: ModelKey): Promise<void> {
       chapterTestHtml(basename(b.dir), b.truth, b.en, b.zh, predictions, best.combined.o),
     );
   }
+}
+
+/**
+ * 先选正文的首尾、再按长度配（1.6）：和直接按长度比，用户要改几行。不需要模型。
+ * 首尾分两种：标准答案里第一组、最后一组正文配对（用户选对了），和 guessAnchors 猜的；
+ * 另外看只选第一章时怎样
+ */
+function anchorTest(dirs: string[]): void {
+  const methods = ['length', 'first', 'both', 'guess'] as const;
+  const totals = Object.fromEntries(methods.map((m) => [m, 0])) as Record<
+    (typeof methods)[number],
+    number
+  >;
+  let guessed = 0;
+  for (const dir of dirs) {
+    const en = bookSections(join(dir, 'en.epub'));
+    const zh = bookSections(join(dir, 'zh.epub'));
+    const truth = (JSON.parse(readFileSync(join(dir, 'chapters.json'), 'utf8')) as ChapterMap)
+      .groups;
+    const real = (ids: number[], s: typeof en) => ids.filter((i) => s[i]!.blocks.length > 0);
+    const paired = inBookOrder(truth).filter(
+      (g) => real(g.en, en).length > 0 && real(g.zh, zh).length > 0,
+    );
+    const [head, tail] = [paired[0]!, paired.at(-1)!];
+    const from = { en: real(head.en, en)[0]!, zh: real(head.zh, zh)[0]! };
+    const to = { en: real(tail.en, en).at(-1)!, zh: real(tail.zh, zh).at(-1)! };
+    const guess = guessAnchors(en, zh);
+    const score = (groups: Parameters<typeof scoreChapters>[1]) =>
+      scoreChapters(truth, groups, en, zh);
+    const results = {
+      length: score(inBookOrder(pairByLength(en, zh))),
+      first: score(pairFromAnchor(en, zh, from)),
+      both: score(pairFromAnchor(en, zh, from, to)),
+      guess: score(pairFromAnchor(en, zh, guess.from, guess.to)),
+    };
+    const title = (s: typeof en, i: number) => `#${i} ${s[i]!.title.slice(0, 24)}`;
+    const show = (
+      label: string,
+      a: typeof from,
+      b: typeof from,
+      answer?: [typeof from, typeof from],
+    ) => {
+      const ok = (x: typeof from, y: typeof from) =>
+        answer === undefined ? '' : x.en === y.en && x.zh === y.zh ? ' ✓' : ' ✗';
+      console.log(
+        `  ${label}  首 英 ${title(en, a.en)} · 中 ${title(zh, a.zh)}${answer ? ok(a, answer[0]) : ''}`,
+      );
+      console.log(
+        `  ${' '.repeat(label.length)}  尾 英 ${title(en, b.en)} · 中 ${title(zh, b.zh)}${answer ? ok(b, answer[1]) : ''}`,
+      );
+    };
+    console.log(`\n${basename(dir)}`);
+    show('答案', from, to);
+    show('猜的', guess.from, guess.to, [from, to]);
+    if (results.guess.toFix === results.both.toFix) guessed++;
+    for (const m of methods) {
+      const r = results[m];
+      totals[m] += r.toFix;
+      console.log(
+        `  ${m.padEnd(7)} 正文 ${r.paired.correct}/${r.paired.total} · 不合并 ${r.unmerged.correct}/${r.unmerged.total} · 要改 ${r.toFix} 行`,
+      );
+    }
+  }
+  console.log(
+    `\n合计要改：按长度 ${totals.length} · 只选对第一章 ${totals.first} · 选对首尾 ${totals.both} · 猜的首尾 ${totals.guess}（${guessed}/${dirs.length} 本和选对首尾一样）`,
+  );
 }
 
 /** 打印几段文字两两之间的相似度，用来快速试一个模型 */

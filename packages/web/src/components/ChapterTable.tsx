@@ -22,6 +22,12 @@ interface Props {
   onChange: (links: Link[]) => void;
   /** 回到程序预填的那一版 */
   onRestore: () => void;
+  /** 表上方那一行：两本书的正文范围 */
+  rangeLine: string;
+  /** 回到第一步改正文范围 */
+  onEditRange: () => void;
+  /** 改了正文范围、表重新预填过：状态栏说一句，可以撤销（回到旧的范围和旧的表） */
+  refilled: { onUndo: () => void } | null;
 }
 
 type Side = keyof Link;
@@ -45,6 +51,9 @@ export function ChapterTable({
   links,
   onChange,
   onRestore,
+  rangeLine,
+  onEditRange,
+  refilled,
 }: Props) {
   const { t } = useLocale();
   const c = t.chapters;
@@ -177,6 +186,17 @@ export function ChapterTable({
             </p>
           )}
 
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-gray-100 px-4 py-2 text-[13px] text-gray-600">
+            <span className="min-w-0">{rangeLine}</span>
+            <button
+              type="button"
+              onClick={onEditRange}
+              className="rounded-md px-1.5 py-0.5 text-blue-700 hover:bg-blue-50"
+            >
+              {c.editRange}
+            </button>
+          </div>
+
           {/* 状态栏：选中时说下一步做什么；刚改过时说改了什么，可以撤销 */}
           <div
             aria-live="polite"
@@ -201,6 +221,17 @@ export function ChapterTable({
                     onChange(last.before);
                     setLast(null);
                   }}
+                  className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100"
+                >
+                  {c.undo}
+                </button>
+              </>
+            ) : refilled !== null ? (
+              <>
+                <span className="min-w-0 flex-1">{c.refilled}</span>
+                <button
+                  type="button"
+                  onClick={refilled.onUndo}
                   className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100"
                 >
                   {c.undo}

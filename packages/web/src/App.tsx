@@ -9,15 +9,23 @@ import {
 import { checkLanguagePair, MAX_FILE_BYTES } from '@epubmerger/core';
 import type { LanguageIssue } from '@epubmerger/core';
 import { useEffect, useRef, useState } from 'react';
-import { componentProblems, components, groupsFromLinks, linksFromGroups } from './chapterTable.ts';
+import { prefillFromRange, sameRange } from './bodyRange.ts';
+import { componentProblems, components, groupsFromLinks } from './chapterTable.ts';
 import type { Empties, Link } from './chapterTable.ts';
+import { BodyRange } from './components/BodyRange.tsx';
 import { BookSlot } from './components/BookSlot.tsx';
 import type { SlotIssue, SlotState } from './components/BookSlot.tsx';
 import { ChapterTable } from './components/ChapterTable.tsx';
 import { IssueNotice } from './components/IssueNotice.tsx';
 import { LanguageSwitch } from './components/LanguageSwitch.tsx';
 import { LayoutPicker } from './components/LayoutPicker.tsx';
-import type { Layout, MergeProgress, MergeStats, PreparedChapters } from './pipeline.ts';
+import type {
+  BodyRange as Range,
+  Layout,
+  MergeProgress,
+  MergeStats,
+  PreparedChapters,
+} from './pipeline.ts';
 import { languageName, useLocale } from './strings/index.tsx';
 import type { Strings } from './strings/en.ts';
 import { call, callback, cancel, CANCELLED } from './worker-client.ts';
@@ -32,13 +40,30 @@ type MergeState =
   /** 错误提示是按当前界面语言生成文字的函数，切换语言后跟着变 */
   | { status: 'error'; message: (t: Strings) => string };
 
+/** 第二步的表：按哪个正文范围预填的；initial 是预填的那一版（"恢复预填"用），links 是用户改过的 */
+interface MatchTable {
+  range: Range;
+  initial: Link[];
+  links: Link[];
+}
+
 /**
- * 章节表。key 是"第一本 id > 第二本 id"，交换、换书后 key 变了，旧表就不用了、重新预填。
- * initial 是程序预填的那一版（"恢复预填"用），links 是用户改过的
+ * 章节的两步（1.6）：第一步选正文首尾，第二步改章节表。key 是"第一本 id > 第二本 id"，
+ * 交换、换书后 key 变了，旧的就不用了，回到第一步重新猜
  */
-type ChapterState =
-  | { key: string; status: 'ready'; info: PreparedChapters; initial: Link[]; links: Link[] }
-  | { key: string; status: 'error'; message: string };
+type ReadyChapters = {
+  key: string;
+  status: 'ready';
+  info: PreparedChapters;
+  step: 'range' | 'table';
+  /** 第一步正在选的范围；一开始是 Worker 猜的 info.range */
+  range: Range;
+  /** 第二步的表，第一次点"下一步"之前是 null */
+  matched: MatchTable | null;
+  /** 改了正文范围、重新预填之前的那张表，撤销用。用户动了新表、或者回到第一步就清掉 */
+  previous: MatchTable | null;
+};
+type ChapterState = ReadyChapters | { key: string; status: 'error'; message: string };
 
 let nextId = 0;
 
@@ -218,8 +243,15 @@ export function App() {
           setChapters({ key, status: 'error', message: result.message });
         } else {
           const info = result.chapters;
-          const initial = linksFromGroups(info.groups);
-          setChapters({ key, status: 'ready', info, initial, links: initial });
+          setChapters({
+            key,
+            status: 'ready',
+            info,
+            step: 'range',
+            range: info.range,
+            matched: null,
+            previous: null,
+          });
         }
       },
       (error: unknown) => {
@@ -237,12 +269,57 @@ export function App() {
   });
   const chaptersReady =
     table?.status === 'ready' &&
-    componentProblems(components(table.links, empties(table.info))).length === 0;
+    table.step === 'table' &&
+    table.matched !== null &&
+    componentProblems(components(table.matched.links, empties(table.info))).length === 0;
+
+  const updateChapters = (update: (c: ReadyChapters) => ReadyChapters) =>
+    setChapters((c) => (c?.status === 'ready' ? update(c) : c));
+
+  /** 第一步点"下一步"：范围没变就回到原来的表；变了就按新范围重新预填，旧表留着撤销用 */
+  const onNext = () => {
+    if (table?.status !== 'ready') return;
+    const { matched, range, info } = table;
+    if (matched !== null && sameRange(matched.range, range)) {
+      updateChapters((c) => ({ ...c, step: 'table' }));
+      return;
+    }
+    resetMerge();
+    const initial = prefillFromRange(info, range);
+    updateChapters((c) => ({
+      ...c,
+      step: 'table',
+      matched: { range, initial, links: initial },
+      previous: c.matched,
+    }));
+  };
+
+  /** 撤销重新预填：回到旧的范围和旧的表 */
+  const onUndoRefill = () => {
+    resetMerge();
+    updateChapters((c) =>
+      c.previous === null
+        ? c
+        : { ...c, range: c.previous.range, matched: c.previous, previous: null },
+    );
+  };
 
   /** 改了章节表：之前的合并结果作废 */
   const onLinks = (links: Link[]) => {
     resetMerge();
-    setChapters((c) => (c?.status === 'ready' ? { ...c, links } : c));
+    updateChapters((c) =>
+      c.matched === null ? c : { ...c, matched: { ...c.matched, links }, previous: null },
+    );
+  };
+
+  /** 表上方那一行：两本书各自的正文首尾 */
+  const rangeLine = (c: ReadyChapters, range: Range) => {
+    const span = (sections: PreparedChapters['first'], from: number, to: number) =>
+      t.chapters.rangeSpan(sections[from]?.title ?? '', sections[to]?.title ?? '');
+    return t.chapters.rangeLine(
+      span(c.info.first, range.from.en, range.to.en),
+      span(c.info.second, range.from.zh, range.to.zh),
+    );
   };
 
   /** 这张卡片上的问题：挂在这本或两本上的，error 优先 */
@@ -257,8 +334,8 @@ export function App() {
 
   const onMerge = async () => {
     if (first.status !== 'ready' || second.status !== 'ready') return;
-    if (table?.status !== 'ready') return;
-    const groups = groupsFromLinks(table.links, empties(table.info), {
+    if (table?.status !== 'ready' || table.matched === null) return;
+    const groups = groupsFromLinks(table.matched.links, empties(table.info), {
       first: table.info.first.length,
       second: table.info.second.length,
     });
@@ -377,15 +454,28 @@ export function App() {
               <p className="py-4 text-center text-sm text-red-600">
                 {t.chapters.prepareFailed(table.message)}
               </p>
+            ) : table.step === 'range' || table.matched === null ? (
+              <BodyRange
+                first={table.info.first}
+                second={table.info.second}
+                firstTitle={first.summary.title}
+                secondTitle={second.summary.title}
+                range={table.range}
+                guessed={table.info.range}
+                onChange={(range) => updateChapters((c) => ({ ...c, range }))}
+              />
             ) : (
               <ChapterTable
                 first={table.info.first}
                 second={table.info.second}
                 firstTitle={first.summary.title}
                 secondTitle={second.summary.title}
-                links={table.links}
+                links={table.matched.links}
                 onChange={onLinks}
-                onRestore={() => onLinks(table.initial)}
+                onRestore={() => onLinks(table.matched!.initial)}
+                rangeLine={rangeLine(table, table.matched.range)}
+                onEditRange={() => updateChapters((c) => ({ ...c, step: 'range', previous: null }))}
+                refilled={table.previous === null ? null : { onUndo: onUndoRefill }}
               />
             )}
           </div>
@@ -407,7 +497,15 @@ export function App() {
               <IssueNotice level="info" messages={[t.sameBookReminder]} />
             ))}
           <div className="flex items-center justify-center gap-2">
-            {needsContinue ? (
+            {table?.status === 'ready' && (table.step === 'range' || table.matched === null) ? (
+              <button
+                type="button"
+                onClick={onNext}
+                className="h-11 rounded-lg bg-blue-600 px-10 text-base font-medium text-white hover:bg-blue-700"
+              >
+                {t.range.next}
+              </button>
+            ) : needsContinue ? (
               <button
                 type="button"
                 disabled={!chaptersReady}
