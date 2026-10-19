@@ -9,8 +9,8 @@
   "scripts": {
     "cli": "tsx packages/cli/src/index.ts",
     "lab": "tsx packages/lab/src/index.ts",
-    "web": "vite packages/web",
-    "web:build": "vite build packages/web",
+    "web": "pnpm --filter @epubmerger/web dev",
+    "web:build": "pnpm --filter @epubmerger/web build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "vitest run --config vitest.browser.config.ts",
