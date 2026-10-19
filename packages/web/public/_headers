@@ -10,7 +10,7 @@
 # 就算代码有 bug，书也发不到别的地方去。
 # blob: 是封面图片用的；合并好的书从 blob: 链接下载，CSP 不管下载
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cloud.umami.is; connect-src 'self' https://cloud.umami.is https://api-gateway.umami.dev https://*.sentry.io; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cloud.umami.is; connect-src 'self' https://gateway.umami.is https://*.sentry.io; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()

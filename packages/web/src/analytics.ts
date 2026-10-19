@@ -5,7 +5,7 @@ import type { Layout, MergeProgress } from './pipeline.ts';
 import type { LoadErrorCode } from './strings/en.ts';
 
 /** Umami 后台"添加网站"后给的编号。空着时什么都不发 */
-const UMAMI_WEBSITE_ID = '';
+const UMAMI_WEBSITE_ID: string = 'd9a24834-d64e-4a7e-8ce5-01cb884c3c9c';
 const UMAMI_SCRIPT = 'https://cloud.umami.is/script.js';
 
 export type SizeBucket = '<5MB' | '5-20MB' | '20-100MB' | '>100MB';
