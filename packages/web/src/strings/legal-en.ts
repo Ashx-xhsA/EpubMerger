@@ -27,7 +27,7 @@ export const legalEn = {
         body: [
           'To see whether the tool works, we count a few anonymous events with Umami, a privacy-friendly analytics service:',
           [
-            'visits: page, referring site, browser, device type and country (from your IP address, which is not stored)',
+            'visits: page, referring site, browser and its language, screen size, device type and country (from your IP address, which is not stored)',
             'a book finished loading: whether it worked or which error occurred, its detected language, and its size range',
             'the body range was confirmed: whether you changed the guessed start or end',
             'merging started: how many sections you re-paired in the chapter table, and the layout',
