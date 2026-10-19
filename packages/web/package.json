@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@epubmerger/core": "workspace:*",
+    "@sentry/browser": "10.76.2",
     "@tabler/icons-react": "3.49.0",
     "comlink": "4.4.2",
     "react": "19.3.1",

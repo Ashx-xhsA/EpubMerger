@@ -178,3 +178,22 @@ export function linkPair(
 export function unpairGroup(links: Link[], comp: Component): Link[] {
   return links.filter((l) => !comp.first.includes(l.first));
 }
+
+/** 和预填相比，搭档变了的节数（两本书的节加起来）。统计用户改了多少，不看顺序 */
+export function changedSections(before: Link[], after: Link[]): number {
+  const partners = (links: Link[]) => {
+    const map = new Map<string, number[]>();
+    const add = (key: string, partner: number) => map.set(key, [...(map.get(key) ?? []), partner]);
+    for (const { first, second } of links) {
+      add(`first ${first}`, second);
+      add(`second ${second}`, first);
+    }
+    return map;
+  };
+  const a = partners(before);
+  const b = partners(after);
+  const same = (x: number[] = [], y: number[] = []) =>
+    x.length === y.length && x.every((n) => y.includes(n));
+  const keys = new Set([...a.keys(), ...b.keys()]);
+  return [...keys].filter((key) => !same(a.get(key), b.get(key))).length;
+}

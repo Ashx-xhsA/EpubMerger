@@ -1,6 +1,7 @@
 // 界面上所有给人看的文字。zh.ts 的类型就是这里的类型，漏翻一条 TypeScript 就报错
 
 import type { ChapterWarningCode, LanguageIssueCode, ParseErrorCode } from '@epubmerger/core';
+import { legalEn } from './legal-en.ts';
 
 /** 读书失败的原因。UNEXPECTED 是 Worker 里抛出了意外的错误，不是 core 的错误码 */
 export type LoadErrorCode = ParseErrorCode | 'UNEXPECTED';
@@ -178,7 +179,10 @@ export const en = {
   ],
 
   footerPrivacy: 'Privacy',
-  footerPersonalUse: 'Personal use only',
+  footerTerms: 'Terms',
+  footerIssues: 'Report a problem',
+
+  legal: legalEn,
 };
 
 export type Strings = typeof en;

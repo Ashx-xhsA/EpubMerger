@@ -1,4 +1,5 @@
 import type { Strings } from './en.ts';
+import { legalZh } from './legal-zh.ts';
 
 export const zh: Strings = {
   htmlLang: 'zh-Hans',
@@ -154,5 +155,8 @@ export const zh: Strings = {
   ],
 
   footerPrivacy: '隐私说明',
-  footerPersonalUse: '仅限个人使用',
+  footerTerms: '使用条款',
+  footerIssues: '反馈问题',
+
+  legal: legalZh,
 };

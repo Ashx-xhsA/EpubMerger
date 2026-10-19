@@ -9,8 +9,10 @@ import {
 import { checkLanguagePair, MAX_FILE_BYTES } from '@epubmerger/core';
 import type { LanguageIssue } from '@epubmerger/core';
 import { useEffect, useRef, useState } from 'react';
+import { charsBucket, countDownload, sizeBucket, track } from './analytics.ts';
 import { prefillFromRange, sameRange } from './bodyRange.ts';
-import { componentProblems, components, groupsFromLinks } from './chapterTable.ts';
+import { reportUnexpected } from './errors.ts';
+import { changedSections, componentProblems, components, groupsFromLinks } from './chapterTable.ts';
 import type { Empties, Link } from './chapterTable.ts';
 import { BodyRange } from './components/BodyRange.tsx';
 import { BookSlot } from './components/BookSlot.tsx';
@@ -27,8 +29,10 @@ import type {
   PreparedChapters,
 } from './pipeline.ts';
 import { languageName, useLocale } from './strings/index.tsx';
-import type { Strings } from './strings/en.ts';
+import type { LoadErrorCode, Strings } from './strings/en.ts';
 import { call, callback, cancel, CANCELLED } from './worker-client.ts';
+
+const REPO_URL = 'https://github.com/Ashx-xhsA/EpubMerger';
 
 type MergeState =
   | { status: 'idle' }
@@ -149,14 +153,18 @@ export function App() {
   const loadInto = async (index: 0 | 1, file: File) => {
     resetMerge();
     const id = nextId++;
+    const report = (result: 'ok' | LoadErrorCode, lang = 'und') =>
+      track({ name: 'book_loaded', result, lang, size: sizeBucket(file.size) });
     setSlots((current) => {
       const copy: typeof current = [...current];
       copy[index] = { status: 'loading', id, fileName: file.name };
       return copy;
     });
     // 太大的文件不读进内存：读进来再复制给 Worker 会很慢，甚至让页面崩掉。上限和 core 用同一个
-    if (file.size > MAX_FILE_BYTES)
+    if (file.size > MAX_FILE_BYTES) {
+      report('TOO_LARGE');
       return updateSlot(id, { status: 'error', id, fileName: file.name, code: 'TOO_LARGE' });
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     let result;
     try {
@@ -165,12 +173,17 @@ export function App() {
     } catch (error) {
       // core 没有返回错误码、而是直接抛错（多半是 core 的 bug）。不然这个框会一直转圈
       console.error(error);
+      reportUnexpected(error, 'load');
+      report('UNEXPECTED');
       return updateSlot(id, { status: 'error', id, fileName: file.name, code: 'UNEXPECTED' });
     }
     if (result === CANCELLED) return updateSlot(id, { status: 'empty' });
-    if (!result.ok)
+    if (!result.ok) {
+      report(result.code);
       return updateSlot(id, { status: 'error', id, fileName: file.name, code: result.code });
-    const { cover } = result.summary;
+    }
+    const { cover, language } = result.summary;
+    report('ok', language.kind === 'single' ? language.lang : 'und');
     // 读的时候这个框已经被移除或换了书，就不生成网址，免得没人释放
     const stillThere = committed.current.some((s) => 'id' in s && s.id === id);
     const coverUrl =
@@ -240,6 +253,7 @@ export function App() {
           // Worker 被换掉了（取消合并），下次渲染时重新请求
           if (requested.current === key) requested.current = null;
         } else if (!result.ok) {
+          reportUnexpected(result.message, 'chapters');
           setChapters({ key, status: 'error', message: result.message });
         } else {
           const info = result.chapters;
@@ -256,6 +270,7 @@ export function App() {
       },
       (error: unknown) => {
         console.error(error);
+        reportUnexpected(error, 'chapters');
         setChapters({ key, status: 'error', message: String(error) });
       },
     );
@@ -280,6 +295,11 @@ export function App() {
   const onNext = () => {
     if (table?.status !== 'ready') return;
     const { matched, range, info } = table;
+    track({
+      name: 'range_confirmed',
+      startChanged: range.from.en !== info.range.from.en || range.from.zh !== info.range.from.zh,
+      endChanged: range.to.en !== info.range.to.en || range.to.zh !== info.range.to.zh,
+    });
     if (matched !== null && sameRange(matched.range, range)) {
       updateChapters((c) => ({ ...c, step: 'table' }));
       return;
@@ -341,6 +361,12 @@ export function App() {
     });
     resetMerge();
     setMerge({ status: 'running', progress: null });
+    track({
+      name: 'merge_started',
+      sectionsChanged: changedSections(table.matched.initial, table.matched.links),
+      layout,
+    });
+    const startedAt = performance.now();
     const onProgress = (progress: MergeProgress) =>
       setMerge((m) => (m.status === 'running' ? { status: 'running', progress } : m));
     const result = await call((api) =>
@@ -359,13 +385,23 @@ export function App() {
       );
       const fileName = `${first.summary.title.replace(/[\\/:*?"<>|]/g, '_')} (bilingual).epub`;
       setMerge({ status: 'done', url, fileName, stats: result.stats });
+      const chars = [...table.info.first, ...table.info.second].reduce((n, s) => n + s.chars, 0);
+      track({
+        name: 'merge_done',
+        seconds: Math.round((performance.now() - startedAt) / 100) / 10,
+        chars: charsBucket(chars),
+        layout,
+      });
     } else if ('issues' in result) {
       // 正常情况下到不了这里：有 error 时按钮已经按不了
       const issue = result.issues.find((i) => i.level === 'error') ?? result.issues[0]!;
+      track({ name: 'merge_failed', code: 'LANGUAGE' });
       const books: [ReadySlot, ReadySlot] = [first, second];
       setMerge({ status: 'error', message: (t) => issueDetail(t, issue, books) });
     } else {
+      track({ name: 'merge_failed', code: 'UNEXPECTED' });
       const { message } = result;
+      reportUnexpected(message, 'merge');
       setMerge({ status: 'error', message: (t) => t.mergeFailed(message) });
     }
   };
@@ -533,6 +569,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => {
+                  track({ name: 'merge_cancelled', stage: merge.progress?.stage ?? 'starting' });
                   cancel();
                   setMerge({ status: 'cancelled' });
                 }}
@@ -549,6 +586,7 @@ export function App() {
               <a
                 href={merge.url}
                 download={merge.fileName}
+                onClick={() => track({ name: 'download', nth: countDownload(() => localStorage) })}
                 className="flex items-center gap-1.5 rounded-lg border border-blue-600 px-5 py-2 text-[15px] text-blue-700 hover:bg-blue-50"
               >
                 <IconDownload size={18} />
@@ -585,11 +623,27 @@ export function App() {
         )}
 
         <footer className="mt-8 flex justify-center gap-4 border-t border-gray-200 pt-4 text-xs text-gray-400">
-          <span>{t.footerPrivacy}</span>
+          {/* 说明页在新标签页打开，这一页读好的书和章节表不会丢 */}
+          <a href="#privacy" target="_blank" className="hover:text-gray-700">
+            {t.footerPrivacy}
+          </a>
           <span>·</span>
-          <span>{t.footerPersonalUse}</span>
+          <a href="#terms" target="_blank" className="hover:text-gray-700">
+            {t.footerTerms}
+          </a>
           <span>·</span>
-          <span>GitHub</span>
+          <a
+            href={`${REPO_URL}/issues`}
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-gray-700"
+          >
+            {t.footerIssues}
+          </a>
+          <span>·</span>
+          <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-gray-700">
+            GitHub
+          </a>
         </footer>
       </main>
     </div>

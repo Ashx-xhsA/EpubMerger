@@ -1,0 +1,16 @@
+# Cloudflare Pages 的响应头。Vite 会把 public/ 原样复制进 dist/
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# 构建出的文件名里带内容的 hash，一改就换名字，可以永久缓存。
+# index.html 用 Cloudflare 的默认（每次都问一下有没有更新），上线后马上能看到新版
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 页面只能加载自己和 Umami 的代码，只能把数据发给自己、Umami、Sentry。
+# 就算代码有 bug，书也发不到别的地方去。
+# blob: 是封面图片用的；合并好的书从 blob: 链接下载，CSP 不管下载
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cloud.umami.is; connect-src 'self' https://cloud.umami.is https://api-gateway.umami.dev https://*.sentry.io; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()

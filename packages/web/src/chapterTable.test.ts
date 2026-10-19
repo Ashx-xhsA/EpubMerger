@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { validateChapterMap, type ChapterGroup } from '@epubmerger/core';
 import { describe, expect, it } from 'vitest';
 import {
+  changedSections,
   componentProblems,
   components,
   groupsFromLinks,
@@ -172,5 +173,20 @@ describe('unpairGroup', () => {
     const links = [l(0, 0), l(1, 1), l(2, 1), l(3, 2)];
     const comp = components(links, noEmpties(4, 3))[1]!;
     expect(unpairGroup(links, comp)).toEqual([l(0, 0), l(3, 2)]);
+  });
+});
+
+describe('changedSections', () => {
+  const l = (first: number, second: number): Link => ({ first, second });
+
+  it('is zero when the table was not touched, in any order', () => {
+    expect(changedSections([l(0, 0), l(1, 1)], [l(1, 1), l(0, 0)])).toBe(0);
+  });
+
+  it('counts sections on both sides whose partners changed', () => {
+    // 第一本第 1 节从配第二本第 1 节改成第 2 节：第一本 1 节，第二本 1、2 两节都变了
+    expect(changedSections([l(0, 0), l(1, 1)], [l(0, 0), l(1, 2)])).toBe(3);
+    // 拆开一对：两边各一节变成没有搭档
+    expect(changedSections([l(0, 0)], [])).toBe(2);
   });
 });
