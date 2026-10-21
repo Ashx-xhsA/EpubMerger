@@ -148,7 +148,7 @@ export function ChapterTable({
       <header className="flex items-start gap-3 border-b border-gray-200 px-4 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-[15px] font-medium">{c.title}</h2>
-          {open && <p className="mt-0.5 text-[13px] text-gray-500">{c.hint}</p>}
+          {open && <p className="mt-0.5 text-[13px] whitespace-pre-line text-gray-500">{c.hint}</p>}
         </div>
         {open && (
           <button

@@ -3,7 +3,7 @@ import { legalZh } from './legal-zh.ts';
 
 export const zh: Strings = {
   htmlLang: 'zh-Hans',
-  tagline: '把同一本书的两个语言版本，合成一本双语 ePub',
+  tagline: '把同一本书的两个语言的版本合并成一个 ePub 文件',
   privacy: '文件只在你的浏览器里处理，不会上传',
 
   slotFirst: '排在前面',
@@ -11,7 +11,7 @@ export const zh: Strings = {
   slotLeft: '排在左边',
   slotRight: '排在右边',
   bookFallback: (n: number) => `第 ${n} 本`,
-  dropHint: '拖进来，或点击选择',
+  dropHint: '拖拽进框或者点击选择',
   dropSub: '.epub 文件，无 DRM',
   reading: '读取中…',
   remove: '移除',
@@ -27,7 +27,7 @@ export const zh: Strings = {
     VERTICAL_LAYOUT: { title: '竖排的书', hint: '暂不支持，请换横排的版本' },
     UNEXPECTED: { title: '读取时出了意外的错误', hint: '换一个版本的文件试试' },
   },
-  languageUnclear: '语言不确定',
+  languageUnclear: '不确定是什么语言',
   languageNames: {
     en: '英文',
     'zh-Hans': '简体中文',
@@ -78,9 +78,9 @@ export const zh: Strings = {
         `《${title}》是${lang}。目前只用英文和简体中文的书测试过，其他语言也可以合并，但效果没有验证过。`,
     },
     LANGUAGE_UNCERTAIN: {
-      label: () => '语言不确定',
+      label: () => '不确定是什么语言',
       detail: (_lang, title) =>
-        `认不出《${title}》的语言，可能已经是双语书，或者正文很少。确认没问题可以继续。`,
+        `认不出《${title}》的语言，可能已经是双语书或者正文很少。确认没问题后就继续吧`,
     },
   },
   continueAnyway: '仍然继续',
@@ -92,23 +92,23 @@ export const zh: Strings = {
   tocNotice: {
     TOC_MISSING: (title, count) =>
       count === 1
-        ? `《${title}》没有可用的目录，整本书当成了一节，对齐会不太准。最好换一个带目录的版本。`
+        ? `《${title}》没有可用的目录，对齐会不太准。最好换一个带目录的版本。`
         : `《${title}》没有可用的目录，已按文件分成 ${count} 节，对齐会不太准。最好换一个带目录的版本。`,
     TOC_UNRELIABLE: (title, count) =>
       count === 1
-        ? `《${title}》的目录不完整，整本书当成了一节，对齐会不太准。最好换一个目录完整的版本。`
+        ? `《${title}》的目录不完整，对齐会不太准。最好换一个目录完整的版本。`
         : `《${title}》的目录不完整，已按文件分成 ${count} 节，对齐会不太准。最好换一个目录完整的版本。`,
   },
 
   range: {
     title: '第一步 · 正文从哪里开始、到哪里结束？',
-    hint: '我们先猜了一下，请两本书都看一眼。首尾之外的节（版权页、目录、致谢、下一本的试读……）不会合并。',
+    hint: '我们猜测了一下正文的起止位置，请自己检查一下，如果有错误请修改。正文以外的章节（版权页、目录、致谢等）不会合并。',
     start: '开头',
     end: '结尾',
     outside: '不合并',
     gap: (n) => `中间还有 ${n} 节`,
     collapseGap: '收起中间',
-    restore: '恢复我们猜的',
+    restore: '恢复到我们猜的',
     next: '下一步：检查章节配对',
   },
 
@@ -118,7 +118,7 @@ export const zh: Strings = {
     rangeSpan: (start, end) => (start === end ? `「${start}」` : `「${start}」–「${end}」`),
     editRange: '修改',
     refilled: '已按新的正文范围重新配了章节。',
-    hint: '程序已经在正文范围内按长度配了一遍，合并前请检查。蓝色是配上的，同一行左右对应。灰色虚线框是没配上的：左边的照样留在书里、只有原文，右边的不收录。',
+    hint: '程序已经在正文范围内按长度配对了一遍，合并前请检查。蓝色是配对的，同一行左右对应。\n灰色虚线框是没配对上的：左边是骨架书，章节即使没有配对上也会留在合并后的书里。右边的章节没有配对上就会在结果的书中丢弃。',
     preparing: '正在整理章节…',
     prepareFailed: (message) => `读取章节失败：${message}`,
     restore: '恢复预填',
@@ -148,10 +148,10 @@ export const zh: Strings = {
   tipsTitle: '这样的书效果最好',
   tips: [
     '有完整的目录',
-    '图片、图表少，小说和散文最好',
-    '两本是同一个版本，不是删节版或改编版',
+    '图片、图表少',
+    '两本是同一个版本，没有删节',
     '没有 DRM 保护',
-    '英文和简体中文效果最好，其他语言也可以试',
+    '英文和简体中文是我测试过的组合，其他语言也可以试试，欢迎给我反馈！',
   ],
 
   footerPrivacy: '隐私说明',

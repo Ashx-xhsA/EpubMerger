@@ -420,7 +420,10 @@ export function App() {
         </div>
 
         <header className="mt-6 mb-8 text-center">
-          <h1 className="text-[28px] font-medium">EpubMerger</h1>
+          <h1 className="flex items-center justify-center gap-2 text-[28px] font-medium">
+            <img src="/favicon.svg" alt="" className="size-8" />
+            EpubMerger
+          </h1>
           <p className="mt-1.5 text-[15px] text-gray-600">{t.tagline}</p>
           <p className="mt-1 flex items-center justify-center gap-1 text-[13px] text-gray-400">
             <IconLock size={14} />

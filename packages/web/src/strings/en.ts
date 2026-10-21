@@ -15,7 +15,7 @@ interface LanguageIssueText {
 
 export const en = {
   htmlLang: 'en',
-  tagline: 'Merge two language editions of the same book into one bilingual ePub',
+  tagline: 'Merge two language editions of the same book into one ePub file',
   privacy: 'Your files never leave your browser',
 
   slotFirst: 'Shown first',
@@ -115,17 +115,17 @@ export const en = {
   tocNotice: {
     TOC_MISSING: (title: string, count: number) =>
       count === 1
-        ? `“${title}” has no usable table of contents, so the whole book is treated as one section. Matching will be less accurate; an edition with a table of contents works better.`
+        ? `“${title}” has no usable table of contents. Matching will be less accurate; an edition with a table of contents works better.`
         : `“${title}” has no usable table of contents, so it was split by file into ${count} sections. Matching will be less accurate; an edition with a table of contents works better.`,
     TOC_UNRELIABLE: (title: string, count: number) =>
       count === 1
-        ? `The table of contents of “${title}” is incomplete, so the whole book is treated as one section. Matching will be less accurate; an edition with a complete table of contents works better.`
+        ? `The table of contents of “${title}” is incomplete. Matching will be less accurate; an edition with a complete table of contents works better.`
         : `The table of contents of “${title}” is incomplete, so it was split by file into ${count} sections. Matching will be less accurate; an edition with a complete table of contents works better.`,
   } as Record<ChapterWarningCode, (title: string, count: number) => string>,
 
   range: {
     title: 'Step 1 · Where does the main text start and end?',
-    hint: 'We made a guess — please check both books. Sections outside the range (copyright, contents, acknowledgements, previews of the next book…) won’t be merged.',
+    hint: 'We guessed where the main text starts and ends — please check it and fix anything that’s wrong. Sections outside the main text (copyright, contents, acknowledgements…) won’t be merged.',
     start: 'Start',
     end: 'End',
     outside: 'not merged',
@@ -142,7 +142,7 @@ export const en = {
       start === end ? `“${start}”` : `“${start}” – “${end}”`,
     editRange: 'Change',
     refilled: 'Matched the chapters again for the new main-text range.',
-    hint: 'Within the main text we matched the chapters by length — check before merging. Blue sections are matched with the one beside them. Grey dashed ones are unmatched: on the left they stay in the book without a translation; on the right they are left out.',
+    hint: 'Within the main text we matched the chapters by length — please check before merging. Blue sections are matched with the one beside them.\nGrey dashed ones are unmatched: the left book is the base book, so its chapters stay in the merged book even when unmatched. Unmatched chapters on the right are dropped from the result.',
     preparing: 'Sorting out the chapters…',
     prepareFailed: (message: string) => `Couldn't read the chapters: ${message}`,
     restore: 'Reset',
@@ -172,10 +172,10 @@ export const en = {
   tipsTitle: 'Works best with books that',
   tips: [
     'have a complete table of contents',
-    'have few images or charts — novels and essays are ideal',
-    'are the same edition in both languages, not abridged or adapted',
+    'have few images or charts',
+    'are the same edition in both languages, not abridged',
     'are DRM-free',
-    'are in English and Simplified Chinese — other languages work too, but are untested',
+    'are in English and Simplified Chinese, the pair I’ve tested — other languages are worth a try too, and feedback is welcome!',
   ],
 
   footerPrivacy: 'Privacy',
