@@ -101,7 +101,10 @@ describe('generateBilingual', () => {
     );
     expect(xhtml).toContain('<p class="bi-insert" xml:lang="zh-Hans">一\u00a0<i>一</i>。</p>');
     expect(xhtml).toContain('href="../bilingual.css"/></head>');
-    expect(new TextDecoder().decode(files['OEBPS/bilingual.css'])).toContain('.bi-insert');
+    const css = new TextDecoder().decode(files['OEBPS/bilingual.css']);
+    expect(css).toContain('.bi-insert');
+    // 插入的中文段落缩进两个字，EPUB 2 只有 xml:lang 也要能匹配
+    expect(css).toContain('p.bi-insert:lang(zh),\np.bi-insert[lang|="zh"] {\n  text-indent: 2em;');
     // 骨架书没改的部分原样保留
     expect(xhtml).toContain(filler);
   });

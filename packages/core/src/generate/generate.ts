@@ -21,12 +21,17 @@ import { packageEpub } from './package.ts';
 
 /**
  * 保守的写法：只用字号、边距和最基本的表格（墨水屏上颜色没用），具体数值等 0.12 真机看过再调。
- * 两栏时格子里的译文不缩小字号、不加上边距
+ * 两栏时格子里的译文不缩小字号、不加上边距。
+ * 插入的中文段落首行缩进两个字（标题不缩）；EPUB 2 只有 xml:lang，所以 :lang() 和 [lang] 都写
  */
 export const BILINGUAL_CSS = `.${INSERT_CLASS} {
   font-size: 0.92em;
   margin-top: 0.3em;
   margin-bottom: 1em;
+}
+p.${INSERT_CLASS}:lang(zh),
+p.${INSERT_CLASS}[lang|="zh"] {
+  text-indent: 2em;
 }
 table.${ROW_CLASS} {
   width: 100%;
