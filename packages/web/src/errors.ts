@@ -4,6 +4,7 @@
 
 import {
   dedupeIntegration,
+  eventFiltersIntegration,
   globalHandlersIntegration,
   httpContextIntegration,
   init,
@@ -16,6 +17,13 @@ const SENTRY_DSN: string =
   'https://3df02c9d16e7b4cc7f4fe9e39c30ea73@o4512285011148800.ingest.us.sentry.io/4512291550199808';
 const MAX_MESSAGE = 300;
 
+/**
+ * 只上报出错位置在我们自己文件里的错误（正式网址和 Cloudflare 的预览网址）。
+ * 浏览器插件（chrome-extension://…）的错误不报。出错位置不明的（比如控制台里手动抛的，
+ * 位置是 <anonymous>）Sentry 照样会报
+ */
+export const OUR_FILES = /^https:\/\/([a-z0-9-]+\.)?epubmerger\.pages\.dev\//;
+
 let enabled = false;
 
 /** 只在线上构建、填了 DSN 时开启 */
@@ -23,10 +31,17 @@ export function initErrors(): void {
   if (!import.meta.env.PROD || SENTRY_DSN === '') return;
   init({
     dsn: SENTRY_DSN,
-    // 默认的一组功能里有面包屑（记录点击、控制台），会带上页面上的字。只留三样：
-    // 没人接住的错误自动上报、同一个错误连着出现只报一次、带上网址和浏览器型号
+    // 默认的一组功能里有面包屑（记录点击、控制台），会带上页面上的字。只留四样：
+    // 没人接住的错误自动上报、同一个错误连着出现只报一次、带上网址和浏览器型号、
+    // 按 allowUrls 和常见的无关错误过滤
     defaultIntegrations: false,
-    integrations: [globalHandlersIntegration(), dedupeIntegration(), httpContextIntegration()],
+    integrations: [
+      globalHandlersIntegration(),
+      dedupeIntegration(),
+      httpContextIntegration(),
+      eventFiltersIntegration(),
+    ],
+    allowUrls: [OUR_FILES],
     maxBreadcrumbs: 0,
     sendDefaultPii: false,
     beforeSend: scrubEvent,
