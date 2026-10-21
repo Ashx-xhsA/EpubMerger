@@ -11,7 +11,8 @@ import {
 import type { ErrorEvent } from '@sentry/browser';
 
 /** Sentry 项目的 DSN。空着时什么都不发 */
-const SENTRY_DSN: string = '';
+const SENTRY_DSN: string =
+  'https://3df02c9d16e7b4cc7f4fe9e39c30ea73@o4512285011148800.ingest.us.sentry.io/4512291550199808';
 const MAX_MESSAGE = 300;
 
 let enabled = false;
