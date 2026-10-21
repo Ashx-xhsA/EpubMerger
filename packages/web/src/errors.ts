@@ -5,6 +5,7 @@
 import {
   dedupeIntegration,
   globalHandlersIntegration,
+  httpContextIntegration,
   init,
   captureException,
 } from '@sentry/browser';
@@ -22,10 +23,10 @@ export function initErrors(): void {
   if (!import.meta.env.PROD || SENTRY_DSN === '') return;
   init({
     dsn: SENTRY_DSN,
-    // 默认的一组功能里有面包屑（记录点击、控制台），会带上页面上的字。只留两样：
-    // 没人接住的错误自动上报、同一个错误连着出现只报一次
+    // 默认的一组功能里有面包屑（记录点击、控制台），会带上页面上的字。只留三样：
+    // 没人接住的错误自动上报、同一个错误连着出现只报一次、带上网址和浏览器型号
     defaultIntegrations: false,
-    integrations: [globalHandlersIntegration(), dedupeIntegration()],
+    integrations: [globalHandlersIntegration(), dedupeIntegration(), httpContextIntegration()],
     maxBreadcrumbs: 0,
     sendDefaultPii: false,
     beforeSend: scrubEvent,
@@ -55,8 +56,13 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
   delete event.extra;
   delete event.user;
   if (event.request !== undefined) {
-    const { url } = event.request;
-    event.request = url === undefined ? {} : { url: url.split(/[?#]/)[0] };
+    // 网址去掉 ? 和 #；请求头只留浏览器型号（User-Agent），不留从哪个网站来（Referer）
+    const { url, headers } = event.request;
+    const userAgent = headers?.['User-Agent'];
+    event.request = {
+      ...(url === undefined ? {} : { url: url.split(/[?#]/)[0] }),
+      ...(userAgent === undefined ? {} : { headers: { 'User-Agent': userAgent } }),
+    };
   }
   if (event.message !== undefined) event.message = cut(event.message);
   for (const exception of event.exception?.values ?? []) {

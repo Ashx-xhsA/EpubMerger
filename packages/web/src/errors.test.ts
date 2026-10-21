@@ -3,18 +3,24 @@ import { describe, expect, it, vi } from 'vitest';
 import { reportUnexpected, scrubEvent } from './errors.ts';
 
 describe('scrubEvent', () => {
-  it('drops breadcrumbs, extra data, the user and the URL hash and query', () => {
+  it('drops breadcrumbs, extra data, the user, the referrer and the URL hash and query', () => {
     const event = scrubEvent({
       type: undefined,
       breadcrumbs: [{ message: 'ui.click: 第一章 雾中战士' }],
       extra: { title: 'Piranesi' },
       user: { ip_address: '1.2.3.4' },
-      request: { url: 'https://example.pages.dev/?x=1#privacy', headers: { Referer: 'x' } },
+      request: {
+        url: 'https://example.pages.dev/?x=1#privacy',
+        headers: { Referer: 'https://www.douban.com/', 'User-Agent': 'Mozilla/5.0 Safari' },
+      },
     });
     expect(event.breadcrumbs).toBeUndefined();
     expect(event.extra).toBeUndefined();
     expect(event.user).toBeUndefined();
-    expect(event.request).toEqual({ url: 'https://example.pages.dev/' });
+    expect(event.request).toEqual({
+      url: 'https://example.pages.dev/',
+      headers: { 'User-Agent': 'Mozilla/5.0 Safari' },
+    });
   });
 
   it('cuts long error messages', () => {
