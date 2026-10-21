@@ -16,30 +16,36 @@ Merge a book and its translation into one bilingual ePub, with each paragraph fo
 
 ## What you get
 
-Pick one of two layouts. Each translated paragraph sits right under its original:
+Pick one of two layouts: each translated paragraph sits right under its original, or beside it.
 
-<p align="center">
-  <img src="docs/layout-stacked.png" alt="Stacked layout: each English paragraph is followed by the matching German paragraph." width="720">
-</p>
-
-or beside it, in two columns:
-
-<p align="center">
-  <img src="docs/layout-columns.png" alt="Two-column layout: English paragraphs on the left, the matching German paragraphs on the right." width="720">
-</p>
+<table>
+  <tr>
+    <th width="50%">Stacked</th>
+    <th width="50%">Two columns</th>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/layout-stacked.png" alt="Stacked layout: each English paragraph is followed by the matching German paragraph." width="100%"></td>
+    <td valign="top"><img src="docs/layout-columns.png" alt="Two-column layout: English paragraphs on the left, the matching German paragraphs on the right." width="100%"></td>
+  </tr>
+</table>
 
 <sub>From "Little Snow-white" in the Brothers Grimm's fairy tales: Margaret Hunt's English translation (1884) merged with the German original, both public domain and both from <a href="https://www.gutenberg.org/">Project Gutenberg</a> (<a href="https://www.gutenberg.org/ebooks/5314">#5314</a>, <a href="https://www.gutenberg.org/ebooks/77905">#77905</a>). Screenshots are shown in a browser with the book's own styles.</sub>
 
 ## How it works
 
 ```mermaid
-flowchart LR
-  A[Two ePubs] --> B[Parse and detect language]
-  B --> C[Confirm where the main text starts and ends]
-  C --> D[Pair chapters<br/>prefilled, you confirm]
-  D --> E[Align paragraphs<br/>dynamic programming]
-  E --> F[Insert the translation<br/>into one of the books]
-  F --> G[Bilingual ePub]
+flowchart TB
+  subgraph row1 [" "]
+    direction LR
+    A[Two ePubs] --> B[Parse and<br/>detect language] --> C[Confirm where the<br/>main text starts and ends]
+  end
+  subgraph row2 [" "]
+    direction LR
+    D[Pair chapters<br/>prefilled, you confirm] --> E[Align paragraphs<br/>dynamic programming] --> F[Insert the translation<br/>into one of the books] --> G[Bilingual ePub]
+  end
+  row1 --> row2
+  style row1 fill:none,stroke:none
+  style row2 fill:none,stroke:none
 ```
 
 1. **Parse.** Unzip both books, read the table of contents and split every chapter into paragraphs. The language of each book is detected from its text.
