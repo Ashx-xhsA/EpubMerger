@@ -1,0 +1,362 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img" aria-label="An English book and a Chinese book collide and merge into one bilingual book that alternates English and Chinese paragraphs.">
+  <style>
+    .en { font-family: Georgia, 'Times New Roman', serif; }
+    .zh { font-family: 'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', STSong, 'SimSun', serif; }
+
+    .bookL { animation: bookL 10s infinite; }
+    .bookR { animation: bookR 10s infinite; }
+    .scene { animation: shake 10s infinite; }
+    .flash { animation: flash 10s infinite; }
+    .burst { animation: burst 10s infinite; }
+    .s1 { animation: s1 10s infinite; }
+    .s2 { animation: s2 10s infinite; }
+    .s3 { animation: s3 10s infinite; }
+    .s4 { animation: s4 10s infinite; }
+    .sp { transform-box: fill-box; transform-origin: center; }
+    .spA { animation: spA 10s infinite; }
+    .spB { animation: spB 10s infinite; }
+    .spC { animation: spC 10s infinite; }
+    .merged { animation: merged 10s infinite; }
+    .open { animation: open 10s infinite; }
+    .l1 { animation: l1 10s infinite; }
+    .l2 { animation: l2 10s infinite; }
+    .l3 { animation: l3 10s infinite; }
+    .l4 { animation: l4 10s infinite; }
+    .l5 { animation: l5 10s infinite; }
+    .l6 { animation: l6 10s infinite; }
+    .l7 { animation: l7 10s infinite; }
+
+    @keyframes bookL {
+      0% { transform: translate(-120px, 220px) rotate(-12deg); opacity: 1; animation-timing-function: cubic-bezier(.2, .9, .3, 1.25); }
+      8% { transform: translate(250px, 220px) rotate(0deg); }
+      15% { transform: translate(250px, 220px) rotate(0deg); animation-timing-function: ease-out; }
+      19% { transform: translate(212px, 220px) rotate(-8deg); animation-timing-function: cubic-bezier(.7, 0, 1, .5); }
+      23% { transform: translate(440px, 220px) rotate(0deg); opacity: 1; }
+      23.01%, 100% { transform: translate(440px, 220px); opacity: 0; }
+    }
+    @keyframes bookR {
+      0% { transform: translate(1080px, 220px) rotate(12deg); opacity: 1; animation-timing-function: cubic-bezier(.2, .9, .3, 1.25); }
+      8% { transform: translate(710px, 220px) rotate(0deg); }
+      15% { transform: translate(710px, 220px) rotate(0deg); animation-timing-function: ease-out; }
+      19% { transform: translate(748px, 220px) rotate(8deg); animation-timing-function: cubic-bezier(.7, 0, 1, .5); }
+      23% { transform: translate(520px, 220px) rotate(0deg); opacity: 1; }
+      23.01%, 100% { transform: translate(520px, 220px); opacity: 0; }
+    }
+    @keyframes shake {
+      0%, 23% { transform: translate(0, 0); }
+      24% { transform: translate(-10px, 6px); }
+      25% { transform: translate(9px, -6px); }
+      26% { transform: translate(-6px, 4px); }
+      27% { transform: translate(3px, -2px); }
+      28%, 100% { transform: translate(0, 0); }
+    }
+    @keyframes flash {
+      0%, 22.99% { transform: translate(480px, 220px) scale(.2); opacity: 0; }
+      23% { transform: translate(480px, 220px) scale(.3); opacity: 1; animation-timing-function: ease-out; }
+      32%, 100% { transform: translate(480px, 220px) scale(7); opacity: 0; }
+    }
+    @keyframes burst {
+      0%, 22.99% { transform: translate(480px, 220px) scale(0) rotate(-20deg); opacity: 0; }
+      23% { transform: translate(480px, 220px) scale(.4) rotate(-20deg); opacity: 1; animation-timing-function: cubic-bezier(.2, .9, .3, 1.4); }
+      26% { transform: translate(480px, 220px) scale(1.75) rotate(0deg); opacity: 1; }
+      32% { transform: translate(480px, 220px) scale(1.6) rotate(4deg); opacity: 1; }
+      35%, 100% { transform: translate(480px, 220px) scale(2.1) rotate(4deg); opacity: 0; }
+    }
+    .boom { animation: boom 10s infinite; }
+    @keyframes boom {
+      0%, 23.49% { transform: translate(480px, 220px) scale(0) rotate(-12deg); opacity: 0; }
+      23.5% { transform: translate(480px, 220px) scale(.3) rotate(-12deg); opacity: 1; animation-timing-function: cubic-bezier(.15, .9, .3, 1.5); }
+      26.5% { transform: translate(480px, 220px) scale(3.1) rotate(-6deg); }
+      28% { transform: translate(480px, 220px) scale(2.5) rotate(4deg); }
+      29.5% { transform: translate(480px, 220px) scale(2.8) rotate(-2deg); opacity: 1; animation-timing-function: ease-in; }
+      32%, 100% { transform: translate(480px, 220px) scale(3.8) rotate(0deg); opacity: 0; }
+    }
+    @keyframes s1 {
+      0%, 22.99% { transform: translate(480px, 220px) scale(.4); opacity: 0; }
+      23% { transform: translate(480px, 220px) scale(.4) rotate(0deg); opacity: 1; animation-timing-function: ease-out; }
+      38%, 100% { transform: translate(230px, 70px) scale(1.2) rotate(-200deg); opacity: 0; }
+    }
+    @keyframes s2 {
+      0%, 22.99% { transform: translate(480px, 220px) scale(.4); opacity: 0; }
+      23% { transform: translate(480px, 220px) scale(.4) rotate(0deg); opacity: 1; animation-timing-function: ease-out; }
+      38%, 100% { transform: translate(740px, 80px) scale(1.2) rotate(220deg); opacity: 0; }
+    }
+    @keyframes s3 {
+      0%, 22.99% { transform: translate(480px, 220px) scale(.4); opacity: 0; }
+      23% { transform: translate(480px, 220px) scale(.4) rotate(0deg); opacity: 1; animation-timing-function: ease-out; }
+      38%, 100% { transform: translate(250px, 385px) scale(1.2) rotate(-180deg); opacity: 0; }
+    }
+    @keyframes s4 {
+      0%, 22.99% { transform: translate(480px, 220px) scale(.4); opacity: 0; }
+      23% { transform: translate(480px, 220px) scale(.4) rotate(0deg); opacity: 1; animation-timing-function: ease-out; }
+      38%, 100% { transform: translate(720px, 390px) scale(1.2) rotate(190deg); opacity: 0; }
+    }
+    /* Sparkles pop in after the bang, twinkle once, and fade before the page opens. */
+    @keyframes spA {
+      0%, 24% { transform: scale(0) rotate(0deg); opacity: 0; }
+      26.5% { transform: scale(1.3) rotate(45deg); opacity: 1; }
+      30% { transform: scale(.7) rotate(70deg); opacity: 1; }
+      33% { transform: scale(1.1) rotate(90deg); opacity: 1; }
+      39%, 100% { transform: scale(0) rotate(135deg); opacity: 0; }
+    }
+    @keyframes spB {
+      0%, 25.5% { transform: scale(0) rotate(0deg); opacity: 0; }
+      28% { transform: scale(1.3) rotate(-45deg); opacity: 1; }
+      31.5% { transform: scale(.7) rotate(-70deg); opacity: 1; }
+      34.5% { transform: scale(1.1) rotate(-90deg); opacity: 1; }
+      41%, 100% { transform: scale(0) rotate(-135deg); opacity: 0; }
+    }
+    @keyframes spC {
+      0%, 27% { transform: scale(0) rotate(0deg); opacity: 0; }
+      29.5% { transform: scale(1.3) rotate(45deg); opacity: 1; }
+      33% { transform: scale(.7) rotate(70deg); opacity: 1; }
+      36% { transform: scale(1.1) rotate(90deg); opacity: 1; }
+      43%, 100% { transform: scale(0) rotate(135deg); opacity: 0; }
+    }
+    @keyframes merged {
+      0%, 30% { transform: translate(480px, 220px) scale(0, 0); animation-timing-function: cubic-bezier(.2, .9, .3, 1.3); }
+      34% { transform: translate(480px, 220px) scale(1.12, 1.12); }
+      37% { transform: translate(480px, 220px) scale(1, 1); animation-timing-function: ease-in-out; }
+      42% { transform: translate(400px, 220px) scale(1, 1); }
+      44% { transform: translate(400px, 220px) scale(1, 1); animation-timing-function: ease-in; }
+      47%, 100% { transform: translate(400px, 220px) scale(0, 1); }
+    }
+    @keyframes open {
+      0%, 47% { transform: translate(400px, 220px) scale(0, 1); opacity: 1; animation-timing-function: ease-out; }
+      51% { transform: translate(400px, 220px) scale(1, 1); opacity: 1; }
+      94% { transform: translate(400px, 220px) scale(1, 1); opacity: 1; }
+      99%, 100% { transform: translate(400px, 220px) scale(1, 1); opacity: 0; }
+    }
+    /* Download button pops in, the cursor clicks it, the label turns into a check. */
+    .btn { animation: btn 10s infinite; }
+    .btnIdle { animation: btnIdle 10s infinite; }
+    .btnDone { animation: btnDone 10s infinite; }
+    .ripple { animation: ripple 10s infinite; }
+    .cursor { animation: cursor 10s infinite; }
+    @keyframes btn {
+      0%, 80% { transform: translate(845px, 220px) scale(0); opacity: 1; animation-timing-function: cubic-bezier(.2, .9, .3, 1.4); }
+      83% { transform: translate(845px, 220px) scale(1.08); }
+      85% { transform: translate(845px, 220px) scale(1); }
+      88% { transform: translate(845px, 220px) scale(1); }
+      88.8% { transform: translate(845px, 220px) scale(.92); }
+      90% { transform: translate(845px, 220px) scale(1); opacity: 1; }
+      94% { transform: translate(845px, 220px) scale(1); opacity: 1; }
+      99%, 100% { transform: translate(845px, 220px) scale(1); opacity: 0; }
+    }
+    @keyframes btnIdle { 0%, 88.8% { opacity: 1; } 89.3%, 100% { opacity: 0; } }
+    @keyframes btnDone { 0%, 88.8% { opacity: 0; } 89.3%, 100% { opacity: 1; } }
+    @keyframes ripple {
+      0%, 88.79% { transform: scale(.3); opacity: 0; }
+      88.8% { transform: scale(.3); opacity: .45; animation-timing-function: ease-out; }
+      93%, 100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes cursor {
+      0%, 84% { transform: translate(945px, 380px); opacity: 0; }
+      85% { transform: translate(945px, 380px); opacity: 1; animation-timing-function: ease-in-out; }
+      88% { transform: translate(870px, 232px) scale(1); opacity: 1; }
+      88.8% { transform: translate(870px, 232px) scale(.85); }
+      90% { transform: translate(870px, 232px) scale(1); opacity: 1; }
+      94% { transform: translate(870px, 232px) scale(1); opacity: 1; }
+      99%, 100% { transform: translate(870px, 232px) scale(1); opacity: 0; }
+    }
+    @keyframes l1 { 0%, 53% { opacity: 0; transform: translate(0, 10px); } 56%, 100% { opacity: 1; transform: translate(0, 0); } }
+    @keyframes l2 { 0%, 57% { opacity: 0; transform: translate(0, 10px); } 60%, 100% { opacity: 1; transform: translate(0, 0); } }
+    @keyframes l3 { 0%, 61% { opacity: 0; transform: translate(0, 10px); } 64%, 100% { opacity: 1; transform: translate(0, 0); } }
+    @keyframes l4 { 0%, 65% { opacity: 0; transform: translate(0, 10px); } 68%, 100% { opacity: 1; transform: translate(0, 0); } }
+    @keyframes l5 { 0%, 69% { opacity: 0; transform: translate(0, 10px); } 72%, 100% { opacity: 1; transform: translate(0, 0); } }
+    @keyframes l6 { 0%, 73% { opacity: 0; transform: translate(0, 10px); } 76%, 100% { opacity: 1; transform: translate(0, 0); } }
+    @keyframes l7 { 0%, 77% { opacity: 0; transform: translate(0, 10px); } 80%, 100% { opacity: 1; transform: translate(0, 0); } }
+
+    /* Readers who turn off motion get the finished page, standing still. */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      .bookL, .bookR, .flash, .burst, .boom, .s1, .s2, .s3, .s4, .sp, .merged, .btnDone, .ripple, .cursor { opacity: 0; }
+      .open { transform: translate(400px, 220px); }
+      .btn { transform: translate(845px, 220px); }
+    }
+  </style>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#111827" flood-opacity=".16"/>
+    </filter>
+    <g id="watch">
+      <rect x="-4" y="-27" width="8" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/>
+      <circle r="19" fill="none" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M0 -12 V0 L8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    <!-- Same mushroom as the site's favicon -->
+    <g id="mushroom">
+      <rect x="-3.2" y="-1" width="6.4" height="12" rx="2.6" fill="#f5ead7" stroke="#5b2a1a" stroke-width="1.4"/>
+      <path d="M-9.5 0.5 A9.5 8.5 0 0 1 9.5 0.5 Z" fill="#dc2626" stroke="#5b2a1a" stroke-width="1.4" stroke-linejoin="round"/>
+      <circle cx="-4" cy="-3.2" r="1.5" fill="#fff"/>
+      <circle cx="2.5" cy="-5.2" r="1.3" fill="#fff"/>
+      <circle cx="5" cy="-1.8" r="1" fill="#fff"/>
+    </g>
+    <path id="star" d="M0 -14 C1.5 -4 4 -1.5 14 0 C4 1.5 1.5 4 0 14 C-1.5 4 -4 1.5 -14 0 C-4 -1.5 -1.5 -4 0 -14 Z"/>
+    <!-- Book depth: page edges on the right and bottom, back cover behind them -->
+    <pattern id="edgeV" width="2.4" height="10" patternUnits="userSpaceOnUse"><rect width="2.4" height="10" fill="#fbf8f1"/><rect width=".8" height="10" fill="#d6cdbb"/></pattern>
+    <pattern id="edgeH" width="10" height="2.4" patternUnits="userSpaceOnUse"><rect width="10" height="2.4" fill="#fbf8f1"/><rect width="10" height=".8" fill="#d6cdbb"/></pattern>
+    <g id="pages">
+      <rect x="-72" y="-97" width="158" height="207" rx="7" fill="currentColor"/>
+      <rect x="68" y="-94" width="14" height="198" fill="url(#edgeV)"/>
+      <rect x="-70" y="94" width="152" height="12" fill="url(#edgeH)"/>
+    </g>
+    <!-- Cover lighting: dark spine, a hinge groove with a highlight, slight falloff on the right -->
+    <linearGradient id="coverShade" x1="0" x2="1">
+      <stop offset="0" stop-color="#000" stop-opacity=".38"/>
+      <stop offset=".06" stop-color="#000" stop-opacity=".12"/>
+      <stop offset=".085" stop-color="#fff" stop-opacity=".3"/>
+      <stop offset=".1" stop-color="#000" stop-opacity=".2"/>
+      <stop offset=".15" stop-color="#000" stop-opacity="0"/>
+      <stop offset=".8" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".14"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".28"/>
+      <stop offset=".42" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset=".43" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <g id="coverLight">
+      <rect x="-75" y="-100" width="150" height="200" rx="8" fill="url(#coverShade)"/>
+      <rect x="-75" y="-100" width="150" height="200" rx="8" fill="url(#gloss)"/>
+      <rect x="-54" y="-88" width="122" height="176" rx="3" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.2"/>
+    </g>
+  </defs>
+
+  <!-- Backdrop -->
+  <rect x="1" y="1" width="958" height="438" rx="24" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+  <g fill="#d1d5db" opacity=".5" font-size="34" class="en">
+    <text x="60" y="80">♠</text><text x="880" y="90">♥</text>
+    <text x="80" y="400">♣</text><text x="870" y="395">♦</text>
+  </g>
+
+  <g class="scene">
+    <!-- English book -->
+    <g class="bookL">
+      <g filter="url(#shadow)">
+        <use href="#pages" color="#1d4ed8"/>
+        <rect x="-75" y="-100" width="150" height="200" rx="8" fill="#2563eb"/>
+        <use href="#coverLight"/>
+        <use href="#watch" x="7" y="-36" color="#ffffff"/>
+        <text x="7" y="20" text-anchor="middle" class="en" font-style="italic" font-size="15" fill="#ffffff">Alice's Adventures</text>
+        <text x="7" y="40" text-anchor="middle" class="en" font-style="italic" font-size="15" fill="#ffffff">in Wonderland</text>
+        <rect x="-11" y="62" width="36" height="20" rx="10" fill="#eff6ff"/>
+        <text x="7" y="76.5" text-anchor="middle" class="en" font-size="12" font-weight="bold" fill="#1d4ed8">EN</text>
+      </g>
+    </g>
+
+    <!-- Chinese book -->
+    <g class="bookR">
+      <g filter="url(#shadow)">
+        <use href="#pages" color="#b91c1c"/>
+        <rect x="-75" y="-100" width="150" height="200" rx="8" fill="#dc2626"/>
+        <use href="#coverLight"/>
+        <use href="#watch" x="7" y="-36" color="#ffffff"/>
+        <text x="7" y="22" text-anchor="middle" class="zh" font-size="20" font-weight="bold" fill="#ffffff">爱丽丝</text>
+        <text x="7" y="48" text-anchor="middle" class="zh" font-size="20" font-weight="bold" fill="#ffffff">梦游仙境</text>
+        <rect x="-11" y="62" width="36" height="20" rx="10" fill="#fef2f2"/>
+        <text x="7" y="76.5" text-anchor="middle" class="en" font-size="12" font-weight="bold" fill="#b91c1c">ZH</text>
+      </g>
+    </g>
+
+    <!-- The bang -->
+    <circle class="flash" r="50" fill="#fef3c7"/>
+    <g class="burst">
+      <polygon points="0.0,-73.6 13.8,-48.4 39.9,-66.3 38.7,-38.8 71.9,-45.9 55.9,-21.5 89.7,-16.4 62.0,0.0 89.7,16.4 55.9,21.5 71.9,45.9 38.7,38.8 39.9,66.3 13.8,48.4 0.0,73.6 -13.8,48.4 -39.9,66.3 -38.7,38.8 -71.9,45.9 -55.9,21.5 -89.7,16.4 -62.0,0.0 -89.7,-16.4 -55.9,-21.5 -71.9,-45.9 -38.7,-38.8 -39.9,-66.3 -13.8,-48.4" fill="#fcd34d" stroke="#111827" stroke-width="3" stroke-linejoin="round"/>
+    </g>
+    <g class="en" font-size="44" text-anchor="middle">
+      <text class="s1" fill="#2563eb">♠</text>
+      <text class="s2" fill="#dc2626">♥</text>
+      <text class="s3" fill="#2563eb">♣</text>
+      <text class="s4" fill="#dc2626">♦</text>
+    </g>
+    <g>
+      <g transform="translate(318 104) scale(1.4)"><use href="#star" class="sp spA" fill="#f59e0b"/></g>
+      <g transform="translate(650 96)"><use href="#star" class="sp spB" fill="#2563eb"/></g>
+      <g transform="translate(672 300) scale(1.2)"><use href="#star" class="sp spA" fill="#dc2626"/></g>
+      <g transform="translate(296 312) scale(1.1)"><use href="#star" class="sp spC" fill="#2563eb"/></g>
+      <g transform="translate(470 54) scale(.8)"><use href="#star" class="sp spC" fill="#dc2626"/></g>
+      <g transform="translate(500 392) scale(.9)"><use href="#star" class="sp spB" fill="#f59e0b"/></g>
+      <g transform="translate(258 206) scale(.7)"><use href="#star" class="sp spB" fill="#f59e0b"/></g>
+      <g transform="translate(708 196) scale(.8)"><use href="#star" class="sp spC" fill="#f59e0b"/></g>
+    </g>
+
+    <!-- The new bilingual book, closed -->
+    <g class="merged">
+      <g filter="url(#shadow)">
+        <use href="#pages" color="#1e3a8a" transform="scale(1.2)"/>
+        <clipPath id="cover"><rect x="-90" y="-120" width="180" height="240" rx="10"/></clipPath>
+        <g clip-path="url(#cover)">
+          <rect x="-90" y="-120" width="180" height="240" fill="#dc2626"/>
+          <path d="M-90 -120 H90 L-90 120 Z" fill="#2563eb"/>
+        </g>
+        <g transform="scale(1.2)">
+          <rect x="-75" y="-100" width="150" height="200" rx="8" fill="url(#coverShade)"/>
+          <rect x="-75" y="-100" width="150" height="200" rx="8" fill="url(#gloss)"/>
+        </g>
+        <rect x="-70" y="-62" width="140" height="124" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+        <use href="#mushroom" y="-36" transform="scale(1.3)"/>
+        <text y="6" text-anchor="middle" class="en" font-style="italic" font-size="14" fill="#111827">Alice in Wonderland</text>
+        <text y="27" text-anchor="middle" class="en" font-size="12" fill="#4b5563">Bilingual Edition</text>
+        <text y="49" text-anchor="middle" class="en" font-size="11" font-weight="bold" letter-spacing="1"><tspan fill="#2563eb">EN</tspan><tspan fill="#9ca3af"> · </tspan><tspan fill="#dc2626">ZH</tspan></text>
+      </g>
+    </g>
+
+    <!-- The word grows past the burst on its own beat -->
+    <g class="boom">
+      <text y="11" text-anchor="middle" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="900" fill="#dc2626" stroke="#111827" stroke-width="1.5" paint-order="stroke">MERGE!</text>
+    </g>
+
+    <!-- The new book, opened -->
+    <g class="open">
+      <g filter="url(#shadow)">
+        <rect x="-330" y="-190" width="660" height="380" rx="12" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+      </g>
+      <g class="l1">
+        <text x="-290" y="-140" class="en" font-size="19" font-weight="bold" fill="#111827">CHAPTER I. Down the Rabbit-Hole</text>
+        <text x="-290" y="-112" class="zh" font-size="17" font-weight="bold" fill="#111827">第一章　掉进兔子洞</text>
+      </g>
+      <g class="l2">
+        <text x="-290" y="-72" class="en" font-size="16" fill="#111827">Alice was beginning to get very tired of sitting by her sister on the bank,</text>
+        <text x="-290" y="-49" class="en" font-size="16" fill="#111827">and of having nothing to do.</text>
+      </g>
+      <g class="l3">
+        <text x="-290" y="-20" class="zh" font-size="15" fill="#111827">爱丽丝陪姐姐坐在河岸上，无事可做，渐渐厌烦起来。</text>
+      </g>
+      <g class="l4">
+        <text x="-290" y="18" class="en" font-size="16" fill="#111827">Once or twice she had peeped into the book her sister was reading,</text>
+        <text x="-290" y="41" class="en" font-size="16" fill="#111827">but it had no pictures or conversations in it.</text>
+      </g>
+      <g class="l5">
+        <text x="-290" y="70" class="zh" font-size="15" fill="#111827">她偷偷瞄过一两眼姐姐在看的书，里面既没有图画，也没有对话。</text>
+      </g>
+      <g class="l6">
+        <text x="-290" y="108" class="en" font-size="16" fill="#111827">“And what is the use of a book,” thought Alice,</text>
+        <text x="-290" y="131" class="en" font-size="16" fill="#111827">“without pictures or conversations?”</text>
+      </g>
+      <g class="l7">
+        <text x="-290" y="160" class="zh" font-size="15" fill="#111827">“一本书要是没有图画，也没有对话，”爱丽丝想，“那还有什么意思呢？”</text>
+      </g>
+    </g>
+
+    <!-- Download button -->
+    <g class="btn" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+      <rect class="ripple" x="-80" y="-26" width="160" height="52" rx="26" fill="#2563eb" style="transform-box: fill-box; transform-origin: center;"/>
+      <g filter="url(#shadow)">
+        <rect x="-80" y="-26" width="160" height="52" rx="26" fill="#2563eb"/>
+      </g>
+      <g class="btnIdle">
+        <path d="M-50 -10 V4 M-56.5 -2.5 L-50 4 L-43.5 -2.5 M-57 10 H-43" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="10" y="6" text-anchor="middle" font-size="17" font-weight="bold" fill="#ffffff">Download</text>
+      </g>
+      <g class="btnDone">
+        <text y="6" text-anchor="middle" font-size="17" font-weight="bold" fill="#ffffff">✓ Downloaded</text>
+      </g>
+      <text y="50" text-anchor="middle" font-size="12" fill="#6b7280">alice-bilingual.epub</text>
+    </g>
+    <g class="cursor">
+      <path d="M0 0 L0 22 L6 16.5 L10 26 L14 24.3 L10 15 L17.5 15 Z" fill="#111827" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>
